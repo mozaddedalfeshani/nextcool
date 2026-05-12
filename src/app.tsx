@@ -8,6 +8,7 @@ import { ProgressDashboard } from "./ui/ProgressDashboard.js";
 import { DoctorView } from "./ui/DoctorView.js";
 import { CoreSelector } from "./ui/CoreSelector.js";
 import { ServerView } from "./ui/ServerView.js";
+import { PmSelector } from "./ui/PmSelector.js";
 import {
   runCool,
   type StepState,
@@ -16,7 +17,7 @@ import {
 } from "./commands/cool.js";
 import { runDoctor, type DoctorReport } from "./commands/doctor.js";
 import { spawnServer, type ServerHandle, type ServerMode } from "./commands/run-server.js";
-import { detectPm, detectNextVersion, isNextProject } from "./lib/detect-pm.js";
+import { detectPm, detectAllPms, detectNextVersion, isNextProject, type PackageManager, type DetectedPm } from "./lib/detect-pm.js";
 import os from "node:os";
 
 const VERSION = "2.0.0";
@@ -33,6 +34,7 @@ type Screen =
   | "no-project"
   | "menu"
   | "manual-select"
+  | "pm-select"
   | "running"
   | "doctor-running"
   | "done"
@@ -92,6 +94,8 @@ export function App(props: AppProps) {
   const [coolOpts, setCoolOpts] = useState<CoolOptions>(
     buildOptsFromMode(mode, props)
   );
+  const [pendingOpts, setPendingOpts] = useState<CoolOptions | null>(null);
+  const [detectedPms, setDetectedPms] = useState<DetectedPm[]>([]);
   const [serverHandle, setServerHandle] = useState<ServerHandle | null>(null);
   const [serverCores, setServerCores] = useState<number>(1);
   const [serverMode, setServerMode] = useState<ServerMode>("dev");
@@ -140,6 +144,17 @@ export function App(props: AppProps) {
     }
   }, []);
 
+  function maybePickPm(opts: CoolOptions) {
+    const all = detectAllPms(cwd);
+    if (all.length > 1) {
+      setDetectedPms(all);
+      setPendingOpts(opts);
+      setScreen("pm-select");
+    } else {
+      void startCool(opts);
+    }
+  }
+
   function handleMenuChoice(choice: MenuChoice) {
     if (choice === "quit") {
       exit();
@@ -161,7 +176,7 @@ export function App(props: AppProps) {
         skipBuild: false,
       };
       setCoolOpts(opts);
-      void startCool(opts);
+      maybePickPm(opts);
       return;
     }
     if (choice === "manual") {
@@ -200,6 +215,12 @@ export function App(props: AppProps) {
       skipBuild: !sel.build,
     };
     setCoolOpts(opts);
+    maybePickPm(opts);
+  }
+
+  function handlePmSelect(selectedPm: PackageManager) {
+    const opts = { ...(pendingOpts ?? coolOpts), pm: selectedPm };
+    setCoolOpts(opts);
     void startCool(opts);
   }
 
@@ -233,6 +254,14 @@ export function App(props: AppProps) {
       {screen === "manual-select" && (
         <ManualSelector
           onConfirm={handleManualConfirm}
+          onBack={() => setScreen("menu")}
+        />
+      )}
+
+      {screen === "pm-select" && detectedPms.length > 1 && (
+        <PmSelector
+          detected={detectedPms}
+          onSelect={handlePmSelect}
           onBack={() => setScreen("menu")}
         />
       )}

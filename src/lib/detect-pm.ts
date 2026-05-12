@@ -3,12 +3,34 @@ import { join } from "node:path";
 
 export type PackageManager = "bun" | "pnpm" | "yarn" | "npm";
 
+export interface DetectedPm {
+  pm: PackageManager;
+  lockfile: string;
+}
+
+const LOCKFILE_MAP: { file: string; pm: PackageManager }[] = [
+  { file: "bun.lockb", pm: "bun" },
+  { file: "bun.lock", pm: "bun" },
+  { file: "pnpm-lock.yaml", pm: "pnpm" },
+  { file: "yarn.lock", pm: "yarn" },
+  { file: "package-lock.json", pm: "npm" },
+];
+
+export function detectAllPms(cwd = process.cwd()): DetectedPm[] {
+  const seen = new Set<PackageManager>();
+  const found: DetectedPm[] = [];
+  for (const { file, pm } of LOCKFILE_MAP) {
+    if (!seen.has(pm) && existsSync(join(cwd, file))) {
+      seen.add(pm);
+      found.push({ pm, lockfile: file });
+    }
+  }
+  return found;
+}
+
 export function detectPm(cwd = process.cwd()): PackageManager {
-  if (existsSync(join(cwd, "bun.lockb")) || existsSync(join(cwd, "bun.lock")))
-    return "bun";
-  if (existsSync(join(cwd, "pnpm-lock.yaml"))) return "pnpm";
-  if (existsSync(join(cwd, "yarn.lock"))) return "yarn";
-  return "npm";
+  const all = detectAllPms(cwd);
+  return all[0]?.pm ?? "npm";
 }
 
 export function detectNextVersion(cwd = process.cwd()): string | null {

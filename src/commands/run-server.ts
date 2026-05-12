@@ -1,6 +1,5 @@
 import { execa } from "execa";
 import { logBus } from "../lib/log-bus.js";
-import { resolveBin } from "../lib/cmd.js";
 import { tryWhich } from "../lib/system.js";
 
 export type ServerMode = "dev" | "start";
@@ -28,15 +27,15 @@ export function spawnServer(opts: RunServerOptions): ServerHandle {
 
   if (process.platform === "linux" && tryWhich("taskset")) {
     cmd = "taskset";
-    args = ["-c", `0-${Math.max(0, cores - 1)}`, resolveBin("npx"), "next", mode];
+    args = ["-c", `0-${Math.max(0, cores - 1)}`, "npx", "next", mode];
   } else if (process.platform === "darwin" || process.platform === "linux") {
     cmd = "nice";
-    args = ["-n", "10", resolveBin("npx"), "next", mode];
+    args = ["-n", "10", "npx", "next", mode];
     env["UV_THREADPOOL_SIZE"] = String(cores);
   } else {
-    // Windows
-    cmd = resolveBin("npx");
-    args = ["next", mode];
+    // Windows: .cmd scripts must run inside cmd.exe
+    cmd = "cmd.exe";
+    args = ["/c", "npx", "next", mode];
   }
 
   const proc = execa(cmd, args, {
@@ -52,15 +51,15 @@ export function spawnServer(opts: RunServerOptions): ServerHandle {
     }
   });
 
-  // Windows: set CPU affinity after spawn
-  if (process.platform === "win32" && proc.pid) {
+  // Windows: set CPU affinity on node.exe processes after spawn
+  if (process.platform === "win32") {
     const mask = (1 << cores) - 1;
     setTimeout(() => {
       execa("powershell", [
         "-Command",
-        `try { (Get-Process -Id ${proc.pid}).ProcessorAffinity = [IntPtr]${mask} } catch {}`,
+        `Get-Process -Name node -ErrorAction SilentlyContinue | ForEach-Object { try { $_.ProcessorAffinity = [IntPtr]${mask} } catch {} }`,
       ]).catch(() => {});
-    }, 50);
+    }, 2000);
   }
 
   return {

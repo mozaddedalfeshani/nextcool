@@ -3,7 +3,7 @@ import { runClean } from "./clean.js";
 import { runPurgeCache } from "./purge-cache.js";
 import { runReinstall } from "./reinstall.js";
 import { runRebuild } from "./rebuild.js";
-import { detectPm } from "../lib/detect-pm.js";
+import { detectPm, type PackageManager } from "../lib/detect-pm.js";
 import { logBus } from "../lib/log-bus.js";
 
 export type StepStatus = "pending" | "running" | "done" | "error" | "skipped";
@@ -24,6 +24,7 @@ export interface CoolOptions {
   skipInstall?: boolean;
   skipBuild?: boolean;
   cwd?: string;
+  pm?: PackageManager;
   onStep?: (steps: StepState[]) => void;
 }
 
@@ -38,7 +39,7 @@ export interface CoolResult {
 
 export async function runCool(opts: CoolOptions = {}): Promise<CoolResult> {
   const cwd = opts.cwd ?? process.cwd();
-  const pm = detectPm(cwd);
+  const pm = opts.pm ?? detectPm(cwd);
   const start = Date.now();
 
   const steps: StepState[] = [
