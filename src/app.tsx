@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Box, Text, useApp } from "ink";
 import { Banner } from "./ui/Banner.js";
+import { StatsBar } from "./ui/StatsBar.js";
 import { MainMenu, type MenuChoice } from "./ui/MainMenu.js";
 import { ManualSelector, type ManualSelection } from "./ui/ManualSelector.js";
 import { ProgressDashboard } from "./ui/ProgressDashboard.js";
@@ -172,6 +173,8 @@ export function App(props: AppProps) {
   return (
     <Box flexDirection="column" paddingX={1}>
       <Banner version={VERSION} pm={pm} nextVersion={nextVersion} platform={platform} />
+
+      <StatsBar />
 
       {error && (
         <Text color="red" bold>
