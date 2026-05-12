@@ -1,6 +1,6 @@
 {
   "name": "nextcool",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Kill zombie node processes, purge caches, rebuild Next.js — stop laptop overheating.",
   "type": "module",
   "bin": {
@@ -31,15 +31,15 @@
     "cli",
     "developer-tools"
   ],
-  "author": "",
+  "author": "mozaddedalfeshani",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/YOUR_USERNAME/nextcool.git"
+    "url": "git+https://github.com/mozaddedalfeshani/nextcool.git"
   },
-  "homepage": "https://github.com/YOUR_USERNAME/nextcool#readme",
+  "homepage": "https://github.com/mozaddedalfeshani/nextcool#readme",
   "bugs": {
-    "url": "https://github.com/YOUR_USERNAME/nextcool/issues"
+    "url": "https://github.com/mozaddedalfeshani/nextcool/issues"
   },
   "dependencies": {
     "commander": "^12.1.0",

@@ -16,7 +16,7 @@ import { runDoctor, type DoctorReport } from "./commands/doctor.js";
 import { detectPm, detectNextVersion, isNextProject } from "./lib/detect-pm.js";
 import os from "node:os";
 
-const VERSION = "0.1.0";
+const VERSION = "0.1.1";
 
 export type AppMode =
   | "interactive"   // show main menu
