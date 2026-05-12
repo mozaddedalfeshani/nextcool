@@ -1,0 +1,65 @@
+{
+  "name": "nextcool",
+  "version": "0.1.0",
+  "description": "Kill zombie node processes, purge caches, rebuild Next.js — stop laptop overheating.",
+  "type": "module",
+  "bin": {
+    "nextcool": "./bin/nextcool.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "node --experimental-vm-modules node_modules/.bin/jest"
+  },
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "keywords": [
+    "nextjs",
+    "cache",
+    "cleanup",
+    "turbopack",
+    "performance",
+    "cli",
+    "developer-tools"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YOUR_USERNAME/nextcool.git"
+  },
+  "homepage": "https://github.com/YOUR_USERNAME/nextcool#readme",
+  "bugs": {
+    "url": "https://github.com/YOUR_USERNAME/nextcool/issues"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "execa": "^9.5.2",
+    "fkill": "^8.1.0",
+    "ink": "^5.2.1",
+    "ink-gradient": "^3.0.0",
+    "ink-progress-bar": "^3.0.0",
+    "ink-spinner": "^5.0.0",
+    "picocolors": "^1.1.1",
+    "ps-list": "^8.1.1",
+    "react": "^18.3.1",
+    "check-disk-space": "^3.4.0",
+    "fast-folder-size": "^2.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "ink-testing-library": "^3.0.0"
+  }
+}
