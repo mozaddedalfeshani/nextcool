@@ -12,7 +12,7 @@ import {
   type CoolResult,
 } from "./commands/cool.js";
 import { runDoctor, type DoctorReport } from "./commands/doctor.js";
-import { detectPm, detectNextVersion } from "./lib/detect-pm.js";
+import { detectPm, detectNextVersion, isNextProject } from "./lib/detect-pm.js";
 import os from "node:os";
 
 const VERSION = "0.1.0";
@@ -26,6 +26,7 @@ export type AppMode =
   | "doctor";
 
 type Screen =
+  | "no-project"
   | "menu"
   | "manual-select"
   | "running"
@@ -68,7 +69,11 @@ export function App(props: AppProps) {
   const nextVersion = detectNextVersion(cwd);
   const platform = `${os.platform()} ${os.arch()}`;
 
+  const needsNextProject = mode !== "doctor" && mode !== "kill" && mode !== "purge";
+  const noProject = needsNextProject && !isNextProject(cwd);
+
   const [screen, setScreen] = useState<Screen>(() => {
+    if (noProject && mode === "interactive") return "no-project";
     if (mode === "interactive") return "menu";
     if (mode === "doctor") return "doctor-running";
     return "running";
@@ -111,6 +116,11 @@ export function App(props: AppProps) {
 
   // non-interactive modes: auto-start
   useEffect(() => {
+    if (screen === "no-project") {
+      // give Ink one frame to render the error, then exit
+      setTimeout(() => exit(), 100);
+      return;
+    }
     if (mode !== "interactive") {
       if (mode === "doctor") {
         void startDoctor();
@@ -167,6 +177,17 @@ export function App(props: AppProps) {
         <Text color="red" bold>
           Error: {error}
         </Text>
+      )}
+
+      {screen === "no-project" && (
+        <Box flexDirection="column" marginTop={1}>
+          <Text color="red" bold>✗ No Next.js project found in:</Text>
+          <Text color="yellow">  {cwd}</Text>
+          <Text dimColor>  Make sure package.json has a "next" dependency.</Text>
+          <Text> </Text>
+          <Text dimColor>  cd into your Next.js project, then run:</Text>
+          <Text color="cyan">  nextcool</Text>
+        </Box>
       )}
 
       {screen === "menu" && (

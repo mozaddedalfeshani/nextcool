@@ -78,10 +78,9 @@ const program = new Command()
 
 // Default: no subcommand → interactive TUI menu (or auto-cool in non-TTY/CI)
 addSharedOpts(program).action((opts: SharedOpts) => {
-  const isTTY = Boolean(process.stdin.isTTY);
+  const isTTY = Boolean(process.stdin.isTTY) || Boolean(process.stdout.isTTY);
   const mode: AppMode = isTTY && !opts.yes ? "interactive" : "cool";
-  if (!isTTY && !opts.yes) {
-    // non-interactive environment — guard project check
+  if (!isTTY || opts.yes) {
     guardNextProject(opts.cwd, opts.force);
   }
   mount(mode, opts);
