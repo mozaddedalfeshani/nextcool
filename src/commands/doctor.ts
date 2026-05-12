@@ -25,12 +25,8 @@ export interface DoctorReport {
 async function estimateDirMb(dir: string): Promise<number> {
   if (!existsSync(dir)) return 0;
   try {
-    const { default: fastFolderSize } = await import("fast-folder-size");
-    const bytes = await new Promise<number>((res, rej) =>
-      fastFolderSize(dir, (err: unknown, size?: number) =>
-        err ? rej(err) : res(size ?? 0)
-      )
-    );
+    const { default: getFolderSize } = await import("get-folder-size");
+    const bytes = await getFolderSize.loose(dir);
     return Math.floor(bytes / 1024 / 1024);
   } catch {
     return 0;

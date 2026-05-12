@@ -53,7 +53,7 @@
     "ps-list": "^8.1.1",
     "react": "^18.3.1",
     "check-disk-space": "^3.4.0",
-    "fast-folder-size": "^2.2.0"
+    "get-folder-size": "^5.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

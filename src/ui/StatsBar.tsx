@@ -52,22 +52,22 @@ function availableBytes(): number {
     } catch { /* fall through */ }
   }
 
-  // Windows: use wmic or PowerShell
+  // Windows: PowerShell first (wmic removed in Windows 11 22H2+)
   if (process.platform === "win32") {
     try {
       const out = execSync(
-        "wmic OS get FreePhysicalMemory /Value",
+        "powershell -Command \"(Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory\"",
         { encoding: "utf8" }
       );
-      const kb = parseInt(out.match(/FreePhysicalMemory=(\d+)/)?.[1] ?? "0", 10);
+      const kb = parseInt(out.trim(), 10);
       if (kb > 0) return kb * 1024;
     } catch {
       try {
         const out = execSync(
-          "powershell -Command \"(Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory\"",
+          "wmic OS get FreePhysicalMemory /Value",
           { encoding: "utf8" }
         );
-        const kb = parseInt(out.trim(), 10);
+        const kb = parseInt(out.match(/FreePhysicalMemory=(\d+)/)?.[1] ?? "0", 10);
         if (kb > 0) return kb * 1024;
       } catch { /* fall through */ }
     }

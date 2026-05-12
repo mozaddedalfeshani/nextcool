@@ -35,12 +35,8 @@ export async function safeRm(
 
 async function dirSize(dir: string): Promise<number> {
   try {
-    const { default: fastFolderSize } = await import("fast-folder-size");
-    return await new Promise<number>((res, rej) =>
-      fastFolderSize(dir, (err: unknown, size?: number) =>
-        err ? rej(err) : res(size ?? 0)
-      )
-    );
+    const { default: getFolderSize } = await import("get-folder-size");
+    return await getFolderSize.loose(dir);
   } catch {
     return 0;
   }
