@@ -32,7 +32,6 @@ export async function runRebuild(opts: RebuildOptions = {}): Promise<RebuildResu
     return { exitCode: 0, success: true, useWebpack };
   }
 
-  // try npx next build (works regardless of how next is installed)
   const result = await runCmd("rebuild", "npx", ["next", ...args], {
     cwd: opts.cwd,
     env,

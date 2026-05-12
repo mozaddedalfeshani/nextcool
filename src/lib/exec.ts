@@ -20,15 +20,10 @@ export async function runCmd(
     all: true,
   });
 
-  const lines: string[] = [];
-
   proc.all?.on("data", (chunk: Buffer) => {
     const text = chunk.toString();
     for (const line of text.split("\n")) {
-      if (line.trim()) {
-        logBus.push(stepId, line);
-        lines.push(line);
-      }
+      if (line.trim()) logBus.push(stepId, line);
     }
   });
 

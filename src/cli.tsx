@@ -1,7 +1,7 @@
 import React from "react";
 import { render } from "ink";
 import { Command } from "commander";
-import { App } from "./app.js";
+import { App, type AppMode } from "./app.js";
 import { isNextProject } from "./lib/detect-pm.js";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -9,8 +9,6 @@ import { fileURLToPath } from "node:url";
 import type { CoolOptions } from "./commands/cool.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-
-type AppMode = "cool" | "clean" | "purge" | "kill" | "doctor";
 
 interface SharedOpts {
   dryRun: boolean;
@@ -47,27 +45,24 @@ function addSharedOpts(cmd: Command): Command {
   return cmd
     .option("--dry-run", "show changes without applying them", false)
     .option("--yes", "skip confirmations (CI mode)", false)
-    .option("--full", "also delete node_modules (use with clean/cool)", false)
+    .option("--full", "also delete node_modules", false)
     .option("--webpack", "rebuild with --no-turbo (Turbopack workaround)", false)
     .option("--memory <mb>", "set NODE_OPTIONS --max-old-space-size", (v) => parseInt(v, 10))
     .option("--cwd <path>", "target project directory", process.cwd())
     .option("--force", "run even outside a Next.js project", false);
 }
 
-function mount(mode: AppMode, opts: SharedOpts): void {
-  const coolOpts: CoolOptions = {
-    dryRun: opts.dryRun,
-    full: opts.full,
-    webpack: opts.webpack,
-    memoryMb: opts.memory,
-    cwd: opts.cwd,
-    skipKill: mode !== "kill" && mode !== "cool",
-    skipInstall: mode !== "cool",
-    skipBuild: mode !== "cool",
-  };
-
+function mount(mode: AppMode, opts: SharedOpts, extraCoolOpts: Partial<CoolOptions> = {}): void {
   const { waitUntilExit } = render(
-    <App mode={mode} cwd={opts.cwd} {...coolOpts} />,
+    <App
+      mode={mode}
+      cwd={opts.cwd}
+      dryRun={opts.dryRun}
+      full={opts.full}
+      webpack={opts.webpack}
+      memoryMb={opts.memory}
+      {...extraCoolOpts}
+    />,
     { exitOnCtrlC: true }
   );
 
@@ -81,10 +76,21 @@ const program = new Command()
   .description("Kill zombie node processes, purge caches, rebuild Next.js. Beat the heat.")
   .version(getVersion(), "-v, --version");
 
+// Default: no subcommand → interactive TUI menu (or auto-cool in non-TTY/CI)
+addSharedOpts(program).action((opts: SharedOpts) => {
+  const isTTY = Boolean(process.stdin.isTTY);
+  const mode: AppMode = isTTY && !opts.yes ? "interactive" : "cool";
+  if (!isTTY && !opts.yes) {
+    // non-interactive environment — guard project check
+    guardNextProject(opts.cwd, opts.force);
+  }
+  mount(mode, opts);
+});
+
 addSharedOpts(
   program
-    .command("cool", { isDefault: true })
-    .description("Full pipeline: kill → clean artifacts → purge PM cache → reinstall → rebuild")
+    .command("cool")
+    .description("Full pipeline: kill → clean → purge PM cache → reinstall → rebuild (non-interactive)")
 ).action((opts: SharedOpts) => {
   guardNextProject(opts.cwd, opts.force);
   mount("cool", opts);

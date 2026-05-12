@@ -4,7 +4,7 @@ export interface NodeProcess {
   pid: number;
   name: string;
   cmd: string;
-  memory: number; // bytes RSS
+  memory: number;
 }
 
 const NEXT_PATTERNS = [
@@ -37,15 +37,11 @@ export async function killProcesses(
 ): Promise<{ killed: number; skipped: number }> {
   let killed = 0;
   const self = process.pid;
-
   const { default: fkill } = await import("fkill");
 
   for (const p of procs) {
     if (p.pid === self) continue;
-    if (dryRun) {
-      killed++;
-      continue;
-    }
+    if (dryRun) { killed++; continue; }
     try {
       await fkill(p.pid, { force: true, silent: true });
       killed++;
