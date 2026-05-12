@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 
-export type MenuChoice = "auto" | "manual" | "doctor" | "quit";
+export type MenuChoice = "auto" | "manual" | "run-server" | "doctor" | "quit";
 
 interface MainMenuProps {
   onSelect: (choice: MenuChoice) => void;
@@ -10,6 +10,7 @@ interface MainMenuProps {
 const OPTIONS: { label: string; value: MenuChoice; desc: string }[] = [
   { value: "auto", label: "Auto cool", desc: "kill → clean → purge cache → reinstall → rebuild" },
   { value: "manual", label: "Manual", desc: "choose which steps to run" },
+  { value: "run-server", label: "Run Server", desc: "start dev/prod server with CPU core limiting" },
   { value: "doctor", label: "Doctor", desc: "diagnose environment, no changes" },
   { value: "quit", label: "Quit", desc: "" },
 ];

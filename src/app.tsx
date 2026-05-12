@@ -6,6 +6,8 @@ import { MainMenu, type MenuChoice } from "./ui/MainMenu.js";
 import { ManualSelector, type ManualSelection } from "./ui/ManualSelector.js";
 import { ProgressDashboard } from "./ui/ProgressDashboard.js";
 import { DoctorView } from "./ui/DoctorView.js";
+import { CoreSelector } from "./ui/CoreSelector.js";
+import { ServerView } from "./ui/ServerView.js";
 import {
   runCool,
   type StepState,
@@ -13,10 +15,11 @@ import {
   type CoolResult,
 } from "./commands/cool.js";
 import { runDoctor, type DoctorReport } from "./commands/doctor.js";
+import { spawnServer, type ServerHandle, type ServerMode } from "./commands/run-server.js";
 import { detectPm, detectNextVersion, isNextProject } from "./lib/detect-pm.js";
 import os from "node:os";
 
-const VERSION = "0.1.1";
+const VERSION = "2.0.0";
 
 export type AppMode =
   | "interactive"   // show main menu
@@ -33,7 +36,9 @@ type Screen =
   | "running"
   | "doctor-running"
   | "done"
-  | "doctor-done";
+  | "doctor-done"
+  | "run-select"
+  | "run-server";
 
 interface AppProps extends CoolOptions {
   mode: AppMode;
@@ -87,6 +92,10 @@ export function App(props: AppProps) {
   const [coolOpts, setCoolOpts] = useState<CoolOptions>(
     buildOptsFromMode(mode, props)
   );
+  const [serverHandle, setServerHandle] = useState<ServerHandle | null>(null);
+  const [serverCores, setServerCores] = useState<number>(1);
+  const [serverMode, setServerMode] = useState<ServerMode>("dev");
+  const totalCores = os.cpus().length;
 
   async function startCool(opts: CoolOptions) {
     setScreen("running");
@@ -140,6 +149,10 @@ export function App(props: AppProps) {
       void startDoctor();
       return;
     }
+    if (choice === "run-server") {
+      setScreen("run-select");
+      return;
+    }
     if (choice === "auto") {
       const opts: CoolOptions = {
         ...coolOpts,
@@ -155,6 +168,26 @@ export function App(props: AppProps) {
       setScreen("manual-select");
     }
   }
+
+  function handleStartServer(cores: number, sMode: ServerMode) {
+    const handle = spawnServer({ cores, mode: sMode, cwd, stepId: "server" });
+    setServerHandle(handle);
+    setServerCores(cores);
+    setServerMode(sMode);
+    setScreen("run-server");
+  }
+
+  function handleServerStop() {
+    setServerHandle(null);
+    setScreen("menu");
+  }
+
+  // Cleanup server on unmount (Ctrl+C path)
+  useEffect(() => {
+    return () => {
+      if (serverHandle) void serverHandle.stop();
+    };
+  }, [serverHandle]);
 
   function handleManualConfirm(sel: ManualSelection) {
     const opts: CoolOptions = {
@@ -220,6 +253,24 @@ export function App(props: AppProps) {
 
       {(screen === "doctor-done") && doctorReport && (
         <DoctorView report={doctorReport} />
+      )}
+
+      {screen === "run-select" && (
+        <CoreSelector
+          totalCores={totalCores}
+          onStart={handleStartServer}
+          onBack={() => setScreen("menu")}
+        />
+      )}
+
+      {screen === "run-server" && serverHandle && (
+        <ServerView
+          handle={serverHandle}
+          cores={serverCores}
+          totalCores={totalCores}
+          mode={serverMode}
+          onStop={handleServerStop}
+        />
       )}
     </Box>
   );

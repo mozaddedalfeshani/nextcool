@@ -1,6 +1,6 @@
-# nextcool
+# nextcool v2.0
 
-> Kill zombie node processes, purge caches, and rebuild your Next.js project — stop your laptop overheating.
+> Kill zombie node processes, purge caches, rebuild your Next.js project, and run dev/prod server with CPU core limiting — stop your laptop overheating.
 
 [![npm version](https://img.shields.io/npm/v/nextcool.svg)](https://www.npmjs.com/package/nextcool)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -47,12 +47,13 @@ nextcool [command] [options]
 
 | Command | Description |
 |---------|-------------|
-| *(default — interactive menu)* | Choose Auto or Manual mode with keyboard |
+| *(default — interactive menu)* | Choose Auto, Manual, Run Server, or Doctor with keyboard |
 | `cool` | Full pipeline: kill → clean → purge cache → reinstall → rebuild |
 | `clean` | Delete `.next`, `.turbo`, `node_modules/.cache`, `.swc`, etc. |
 | `purge` | Wipe package manager cache (bun / pnpm / npm / yarn) |
 | `kill` | Kill all `node` / `next` processes owned by current user |
 | `doctor` | Diagnose environment: RAM, disk, zombies, Turbopack issues |
+| *(Run Server — menu only)* | Start dev/prod server with CPU core limiting, live logs, ESC to stop |
 
 ### Options
 
@@ -77,6 +78,9 @@ nextcool cool --full        # wipe everything and rebuild
 nextcool cool --webpack     # Apple Silicon / Turbopack fix
 nextcool cool --memory 4096 # cap Node.js at 4 GB RAM
 nextcool --dry-run          # preview without touching anything
+
+# Run Server (from interactive menu → Run Server)
+# Select CPU cores with ← → arrows, toggle dev/start with Tab, Enter to start, ESC to stop
 ```
 
 ### Platform support
@@ -138,12 +142,13 @@ nextcool          # ইন্টারেক্টিভ মেনু খুল�
 
 | কমান্ড | কাজ |
 |--------|-----|
-| *(ডিফল্ট — মেনু)* | Auto বা Manual মোড বেছে নিন |
+| *(ডিফল্ট — মেনু)* | Auto, Manual, Run Server বা Doctor মোড বেছে নিন |
 | `cool` | সম্পূর্ণ পাইপলাইন: kill → clean → cache মুছে → reinstall → rebuild |
 | `clean` | `.next`, `.turbo`, `node_modules/.cache` মুছে ফেলে |
 | `purge` | bun / pnpm / npm / yarn ক্যাশ পরিষ্কার করে |
 | `kill` | সব `node` / `next` প্রসেস বন্ধ করে |
 | `doctor` | সিস্টেম ডায়াগনোসিস করে — RAM, ডিস্ক, জম্বি প্রসেস |
+| *(Run Server — মেনু থেকে)* | CPU কোর সীমিত করে dev/start সার্ভার চালায়, ESC দিয়ে বন্ধ করুন |
 
 ### ফ্ল্যাগ
 
