@@ -51,15 +51,15 @@ export function spawnServer(opts: RunServerOptions): ServerHandle {
     }
   });
 
-  // Windows: set CPU affinity on node.exe processes after spawn
-  if (process.platform === "win32") {
+  // Windows: walk process tree rooted at cmd.exe and apply affinity to all descendants.
+  // 3s delay gives Next.js time to spawn turbopack/router workers before we pin them.
+  if (process.platform === "win32" && proc.pid) {
     const mask = (1 << cores) - 1;
+    const rootPid = proc.pid;
     setTimeout(() => {
-      execa("powershell", [
-        "-Command",
-        `Get-Process -Name node -ErrorAction SilentlyContinue | ForEach-Object { try { $_.ProcessorAffinity = [IntPtr]${mask} } catch {} }`,
-      ]).catch(() => {});
-    }, 2000);
+      const script = `$mask = [IntPtr]${mask}; function Set-TreeAffinity($id) { Get-CimInstance Win32_Process -Filter "ParentProcessId = $id" | ForEach-Object { try { (Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue).ProcessorAffinity = $mask } catch {}; Set-TreeAffinity $_.ProcessId } }; Set-TreeAffinity ${rootPid}`;
+      execa("powershell", ["-Command", script]).catch(() => {});
+    }, 3000);
   }
 
   return {
