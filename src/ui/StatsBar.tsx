@@ -1,28 +1,58 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Box, Text } from "ink";
 import os from "node:os";
+import { execSync } from "node:child_process";
 
-interface CpuSnapshot {
-  idle: number;
-  total: number;
-}
+// ── CPU delta sampling ────────────────────────────────────────────────────────
+
+interface CpuSnapshot { idle: number; total: number }
 
 function cpuSnapshot(): CpuSnapshot {
-  let idle = 0;
-  let total = 0;
+  let idle = 0, total = 0;
   for (const cpu of os.cpus()) {
-    const times = cpu.times;
-    idle += times.idle;
-    total += times.idle + times.user + times.sys + times.irq + (times.nice ?? 0);
+    const t = cpu.times;
+    idle += t.idle;
+    total += t.idle + t.user + t.sys + t.irq + (t.nice ?? 0);
   }
   return { idle, total };
 }
 
 function cpuPct(prev: CpuSnapshot, curr: CpuSnapshot): number {
-  const idleDelta = curr.idle - prev.idle;
-  const totalDelta = curr.total - prev.total;
-  if (totalDelta === 0) return 0;
-  return Math.min(100, Math.round((1 - idleDelta / totalDelta) * 100));
+  const di = curr.idle - prev.idle;
+  const dt = curr.total - prev.total;
+  if (dt === 0) return 0;
+  return Math.min(100, Math.round((1 - di / dt) * 100));
+}
+
+// ── RAM — uses available (free + reclaimable cache) not just free ─────────────
+
+function availableBytes(): number {
+  // macOS: free + inactive + speculative + purgeable pages
+  if (process.platform === "darwin") {
+    try {
+      const out = execSync("vm_stat", { encoding: "utf8" });
+      const pageSize = parseInt(out.match(/page size of (\d+)/)?.[1] ?? "16384", 10);
+      const pages = (key: string) =>
+        parseInt(out.match(new RegExp(`${key}:\\s+(\\d+)`))?.[1] ?? "0", 10);
+      return (
+        pages("Pages free") +
+        pages("Pages inactive") +
+        pages("Pages speculative") +
+        pages("Pages purgeable")
+      ) * pageSize;
+    } catch { /* fall through */ }
+  }
+
+  // Linux: MemAvailable from /proc/meminfo
+  if (process.platform === "linux") {
+    try {
+      const out = execSync("grep MemAvailable /proc/meminfo", { encoding: "utf8" });
+      const kb = parseInt(out.match(/(\d+)/)?.[1] ?? "0", 10);
+      return kb * 1024;
+    } catch { /* fall through */ }
+  }
+
+  return os.freemem();
 }
 
 interface Stats {
@@ -34,23 +64,25 @@ interface Stats {
 
 function ramStats(): Omit<Stats, "cpuPct"> {
   const total = os.totalmem();
-  const free = os.freemem();
-  const used = total - free;
+  const avail = availableBytes();
+  const used = total - avail;
   return {
     ramUsedMb: Math.floor(used / 1024 / 1024),
     ramTotalMb: Math.floor(total / 1024 / 1024),
-    ramPct: Math.round((used / total) * 100),
+    ramPct: Math.min(100, Math.round((used / total) * 100)),
   };
 }
 
-function Bar({ pct, width = 12, danger = 85 }: { pct: number; width?: number; danger?: number }) {
+// ── UI ────────────────────────────────────────────────────────────────────────
+
+function Bar({ pct, width = 12 }: { pct: number; width?: number }) {
   const filled = Math.round((pct / 100) * width);
-  const empty = width - filled;
-  const color = pct >= danger ? "red" : pct >= 60 ? "yellow" : "green";
+  const empty = Math.max(0, width - filled);
+  const color = pct >= 85 ? "red" : pct >= 60 ? "yellow" : "green";
   return (
     <Text>
       <Text color={color}>{"█".repeat(Math.max(0, filled))}</Text>
-      <Text dimColor>{"░".repeat(Math.max(0, empty))}</Text>
+      <Text dimColor>{"░".repeat(empty)}</Text>
     </Text>
   );
 }
@@ -80,13 +112,13 @@ export function StatsBar() {
     <Box marginBottom={1} gap={3}>
       <Box gap={1}>
         <Text dimColor>RAM</Text>
-        <Bar pct={stats.ramPct} width={12} />
+        <Bar pct={stats.ramPct} />
         <Text color={ramColor}>{stats.ramPct}%</Text>
         <Text dimColor>{fmt(stats.ramUsedMb)}/{fmt(stats.ramTotalMb)}</Text>
       </Box>
       <Box gap={1}>
         <Text dimColor>CPU</Text>
-        <Bar pct={stats.cpuPct} width={12} />
+        <Bar pct={stats.cpuPct} />
         <Text color={cpuColor}>{stats.cpuPct}%</Text>
       </Box>
     </Box>

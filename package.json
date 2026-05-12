@@ -1,6 +1,6 @@
 {
   "name": "nextcool",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Kill zombie node processes, purge caches, rebuild Next.js — stop laptop overheating.",
   "type": "module",
   "bin": {
