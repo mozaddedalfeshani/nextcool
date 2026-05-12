@@ -23,12 +23,20 @@ export async function listNodeProcesses(): Promise<NodeProcess[]> {
         NODE_PATTERN.test(p.name) ||
         NEXT_PATTERNS.some((re) => re.test(p.cmd ?? ""))
     )
-    .map((p) => ({
-      pid: p.pid,
-      name: p.name,
-      cmd: p.cmd ?? "",
-      memory: (p as unknown as { memory?: number }).memory ?? 0,
-    }));
+    .map((p) => {
+      // ps-list returns memory in bytes on macOS/Linux
+      // on Windows the field may be absent or in KB — normalise to bytes
+      const raw = (p as unknown as { memory?: number }).memory ?? 0;
+      const memBytes = process.platform === "win32" && raw > 0 && raw < 1_000_000
+        ? raw * 1024  // Windows returns KB
+        : raw;
+      return {
+        pid: p.pid,
+        name: p.name,
+        cmd: p.cmd ?? "",
+        memory: memBytes,
+      };
+    });
 }
 
 export async function killProcesses(

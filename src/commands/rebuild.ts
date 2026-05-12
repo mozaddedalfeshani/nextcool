@@ -1,5 +1,6 @@
 import { runCmd } from "../lib/exec.js";
 import { logBus } from "../lib/log-bus.js";
+import { resolveBin } from "../lib/cmd.js";
 
 export interface RebuildOptions {
   dryRun?: boolean;
@@ -32,7 +33,7 @@ export async function runRebuild(opts: RebuildOptions = {}): Promise<RebuildResu
     return { exitCode: 0, success: true, useWebpack };
   }
 
-  const result = await runCmd("rebuild", "npx", ["next", ...args], {
+  const result = await runCmd("rebuild", resolveBin("npx"), ["next", ...args], {
     cwd: opts.cwd,
     env,
   });

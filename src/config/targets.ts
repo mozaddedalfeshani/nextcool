@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { PackageManager } from "../lib/detect-pm.js";
+import { resolveBin } from "../lib/cmd.js";
 
 export interface CleanTarget {
   rel: string;
@@ -26,17 +27,17 @@ export function getPmCacheCommands(
 ): { cmd: string; args: string[] }[] {
   switch (pm) {
     case "bun":
-      return [{ cmd: "bun", args: ["pm", "cache", "rm"] }];
+      return [{ cmd: resolveBin("bun"), args: ["pm", "cache", "rm"] }];
     case "pnpm":
-      return [{ cmd: "pnpm", args: ["store", "prune"] }];
+      return [{ cmd: resolveBin("pnpm"), args: ["store", "prune"] }];
     case "yarn":
       return [
-        { cmd: "yarn", args: ["cache", "clean"] },
-        { cmd: "yarn", args: ["cache", "clean", "--all"] },
+        { cmd: resolveBin("yarn"), args: ["cache", "clean"] },
+        { cmd: resolveBin("yarn"), args: ["cache", "clean", "--all"] },
       ];
     case "npm":
     default:
-      return [{ cmd: "npm", args: ["cache", "clean", "--force"] }];
+      return [{ cmd: resolveBin("npm"), args: ["cache", "clean", "--force"] }];
   }
 }
 
@@ -47,12 +48,12 @@ export function getPmInstallCommand(
     case "bun":
       return { cmd: "bun", args: ["install"] };
     case "pnpm":
-      return { cmd: "pnpm", args: ["install"] };
+      return { cmd: resolveBin("pnpm"), args: ["install"] };
     case "yarn":
-      return { cmd: "yarn", args: ["install"] };
+      return { cmd: resolveBin("yarn"), args: ["install"] };
     case "npm":
     default:
-      return { cmd: "npm", args: ["install"] };
+      return { cmd: resolveBin("npm"), args: ["install"] };
   }
 }
 
