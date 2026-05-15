@@ -304,7 +304,7 @@ export function App(props: AppProps) {
       )}
 
       {screen === "doctor-done" && mode === "interactive" && (
-        <Text dimColor>  Press any key to return to menu…</Text>
+        <Text dimColor>  Press ESC to return to menu…</Text>
       )}
 
       {screen === "run-select" && (
