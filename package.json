@@ -42,24 +42,27 @@
     "url": "https://github.com/mozaddedalfeshani/nextcool/issues"
   },
   "dependencies": {
+    "check-disk-space": "^3.4.0",
     "commander": "^12.1.0",
     "execa": "^9.5.2",
     "fkill": "^8.1.0",
+    "get-folder-size": "^5.0.0",
     "ink": "^5.2.1",
     "ink-gradient": "^3.0.0",
     "ink-progress-bar": "^3.0.0",
     "ink-spinner": "^5.0.0",
     "picocolors": "^1.1.1",
     "ps-list": "^8.1.1",
-    "react": "^18.3.1",
-    "check-disk-space": "^3.4.0",
-    "get-folder-size": "^5.0.0"
+    "react": "^18.3.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.0",
+    "eslint": "^10.3.0",
+    "ink-testing-library": "^3.0.0",
     "tsup": "^8.3.0",
     "typescript": "^5.6.0",
-    "ink-testing-library": "^3.0.0"
+    "typescript-eslint": "^8.59.3"
   }
 }

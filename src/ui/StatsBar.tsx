@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Box, Text } from "ink";
 import os from "node:os";
-import { execSync } from "node:child_process";
+import { exec } from "node:child_process";
 
 // ── CPU delta sampling ────────────────────────────────────────────────────────
 
@@ -24,57 +24,47 @@ function cpuPct(prev: CpuSnapshot, curr: CpuSnapshot): number {
   return Math.min(100, Math.round((1 - di / dt) * 100));
 }
 
-// ── RAM — uses available (free + reclaimable cache) not just free ─────────────
+// ── RAM — async so it never blocks the event loop ────────────────────────────
 
-function availableBytes(): number {
-  // macOS: free + inactive + speculative + purgeable pages
-  if (process.platform === "darwin") {
-    try {
-      const out = execSync("vm_stat", { encoding: "utf8" });
-      const pageSize = parseInt(out.match(/page size of (\d+)/)?.[1] ?? "16384", 10);
-      const pages = (key: string) =>
-        parseInt(out.match(new RegExp(`${key}:\\s+(\\d+)`))?.[1] ?? "0", 10);
-      return (
-        pages("Pages free") +
-        pages("Pages inactive") +
-        pages("Pages speculative") +
-        pages("Pages purgeable")
-      ) * pageSize;
-    } catch { /* fall through */ }
-  }
-
-  // Linux: MemAvailable from /proc/meminfo
-  if (process.platform === "linux") {
-    try {
-      const out = execSync("grep MemAvailable /proc/meminfo", { encoding: "utf8" });
-      const kb = parseInt(out.match(/(\d+)/)?.[1] ?? "0", 10);
-      return kb * 1024;
-    } catch { /* fall through */ }
-  }
-
-  // Windows: PowerShell first (wmic removed in Windows 11 22H2+)
-  if (process.platform === "win32") {
-    try {
-      const out = execSync(
-        "powershell -Command \"(Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory\"",
-        { encoding: "utf8" }
-      );
-      const kb = parseInt(out.trim(), 10);
-      if (kb > 0) return kb * 1024;
-    } catch {
-      try {
-        const out = execSync(
-          "wmic OS get FreePhysicalMemory /Value",
-          { encoding: "utf8" }
+function availableBytesAsync(): Promise<number> {
+  return new Promise((resolve) => {
+    if (process.platform === "darwin") {
+      exec("vm_stat", { encoding: "utf8" }, (err, out) => {
+        if (err || !out) return resolve(os.freemem());
+        const pageSize = parseInt(out.match(/page size of (\d+)/)?.[1] ?? "16384", 10);
+        const pages = (key: string) =>
+          parseInt(out.match(new RegExp(`${key}:\\s+(\\d+)`))?.[1] ?? "0", 10);
+        resolve(
+          (pages("Pages free") +
+            pages("Pages inactive") +
+            pages("Pages speculative") +
+            pages("Pages purgeable")) *
+            pageSize
         );
-        const kb = parseInt(out.match(/FreePhysicalMemory=(\d+)/)?.[1] ?? "0", 10);
-        if (kb > 0) return kb * 1024;
-      } catch { /* fall through */ }
+      });
+    } else if (process.platform === "linux") {
+      exec("grep MemAvailable /proc/meminfo", { encoding: "utf8" }, (err, out) => {
+        if (err || !out) return resolve(os.freemem());
+        const kb = parseInt(out.match(/(\d+)/)?.[1] ?? "0", 10);
+        resolve(kb * 1024);
+      });
+    } else if (process.platform === "win32") {
+      exec(
+        'powershell -Command "(Get-CimInstance Win32_OperatingSystem).FreePhysicalMemory"',
+        { encoding: "utf8", timeout: 2000 },
+        (err, out) => {
+          if (err || !out) return resolve(os.freemem());
+          const kb = parseInt(out.trim(), 10);
+          resolve(kb > 0 ? kb * 1024 : os.freemem());
+        }
+      );
+    } else {
+      resolve(os.freemem());
     }
-  }
-
-  return os.freemem();
+  });
 }
+
+// ── UI ────────────────────────────────────────────────────────────────────────
 
 interface Stats {
   ramUsedMb: number;
@@ -83,18 +73,16 @@ interface Stats {
   cpuPct: number;
 }
 
-function ramStats(): Omit<Stats, "cpuPct"> {
+function initialStats(): Stats {
   const total = os.totalmem();
-  const avail = availableBytes();
-  const used = total - avail;
+  const used = total - os.freemem();
   return {
     ramUsedMb: Math.floor(used / 1024 / 1024),
     ramTotalMb: Math.floor(total / 1024 / 1024),
     ramPct: Math.min(100, Math.round((used / total) * 100)),
+    cpuPct: 0,
   };
 }
-
-// ── UI ────────────────────────────────────────────────────────────────────────
 
 function Bar({ pct, width = 12 }: { pct: number; width?: number }) {
   const filled = Math.round((pct / 100) * width);
@@ -114,15 +102,24 @@ function fmt(mb: number): string {
 
 export function StatsBar() {
   const prevCpu = useRef<CpuSnapshot>(cpuSnapshot());
-  const [stats, setStats] = useState<Stats>({ ...ramStats(), cpuPct: 0 });
+  const [stats, setStats] = useState<Stats>(initialStats);
 
   useEffect(() => {
     const id = setInterval(() => {
       const curr = cpuSnapshot();
       const cpu = cpuPct(prevCpu.current, curr);
       prevCpu.current = curr;
-      setStats({ ...ramStats(), cpuPct: cpu });
-    }, 1000);
+      const total = os.totalmem();
+      void availableBytesAsync().then((avail) => {
+        const used = total - avail;
+        setStats({
+          ramUsedMb: Math.floor(used / 1024 / 1024),
+          ramTotalMb: Math.floor(total / 1024 / 1024),
+          ramPct: Math.min(100, Math.round((used / total) * 100)),
+          cpuPct: cpu,
+        });
+      });
+    }, 2000);
     return () => clearInterval(id);
   }, []);
 

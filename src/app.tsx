@@ -123,6 +123,7 @@ export function App(props: AppProps) {
       setScreen("doctor-done");
     } catch (e) {
       setError(String(e));
+      setScreen("doctor-done");
     } finally {
       if (mode !== "interactive") exit();
     }
@@ -130,7 +131,7 @@ export function App(props: AppProps) {
 
   const isResultScreen = screen === "done" || screen === "doctor-done";
   useInput((_input, key) => {
-    if (!mode || mode !== "interactive") return;
+    if (mode !== "interactive") return;
     if (screen === "done") {
       setScreen("menu");
       setSteps([]);
