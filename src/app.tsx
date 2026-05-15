@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Box, Text, useApp } from "ink";
+import { Box, Text, useApp, useInput } from "ink";
 import { Banner } from "./ui/Banner.js";
 import { StatsBar } from "./ui/StatsBar.js";
 import { MainMenu, type MenuChoice } from "./ui/MainMenu.js";
@@ -111,7 +111,7 @@ export function App(props: AppProps) {
       setError(String(e));
       setScreen("done");
     } finally {
-      exit();
+      if (mode !== "interactive") exit();
     }
   }
 
@@ -124,9 +124,24 @@ export function App(props: AppProps) {
     } catch (e) {
       setError(String(e));
     } finally {
-      exit();
+      if (mode !== "interactive") exit();
     }
   }
+
+  const isResultScreen = screen === "done" || screen === "doctor-done";
+  useInput((_input, key) => {
+    if (!mode || mode !== "interactive") return;
+    if (screen === "done") {
+      setScreen("menu");
+      setSteps([]);
+      setResult(null);
+      setError(null);
+    } else if (screen === "doctor-done" && key.escape) {
+      setScreen("menu");
+      setDoctorReport(null);
+      setError(null);
+    }
+  }, { isActive: mode === "interactive" && isResultScreen });
 
   // non-interactive modes: auto-start
   useEffect(() => {
@@ -276,12 +291,20 @@ export function App(props: AppProps) {
         />
       )}
 
+      {screen === "done" && mode === "interactive" && (
+        <Text dimColor>  Press any key to return to menu…</Text>
+      )}
+
       {screen === "doctor-running" && !doctorReport && !error && (
         <Text color="cyan">Running diagnostics...</Text>
       )}
 
-      {(screen === "doctor-done") && doctorReport && (
+      {screen === "doctor-done" && doctorReport && (
         <DoctorView report={doctorReport} />
+      )}
+
+      {screen === "doctor-done" && mode === "interactive" && (
+        <Text dimColor>  Press any key to return to menu…</Text>
       )}
 
       {screen === "run-select" && (
