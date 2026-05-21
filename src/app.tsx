@@ -25,6 +25,7 @@ const VERSION = "2.0.0";
 export type AppMode =
   | "interactive"   // show main menu
   | "cool"
+  | "fullclean"
   | "clean"
   | "purge"
   | "kill"
@@ -45,6 +46,7 @@ type Screen =
 interface AppProps extends CoolOptions {
   mode: AppMode;
   cwd: string;
+  serverAfter?: ServerMode;
 }
 
 function buildOptsFromMode(mode: AppMode, props: AppProps): CoolOptions {
@@ -55,16 +57,20 @@ function buildOptsFromMode(mode: AppMode, props: AppProps): CoolOptions {
     memoryMb: props.memoryMb,
     cwd: props.cwd,
   };
+  // --prod boots `next start`, which requires a fresh build even in clean/purge modes.
+  const forceBuild = props.serverAfter === "start";
   switch (mode) {
     case "cool":
     case "interactive":
       return { ...base, skipKill: false, skipInstall: false, skipBuild: false };
+    case "fullclean":
+      return { ...base, full: true, lint: true, format: true, skipKill: false, skipInstall: false, skipBuild: false };
     case "clean":
-      return { ...base, skipKill: true, skipInstall: true, skipBuild: true };
+      return { ...base, skipKill: true, skipInstall: true, skipBuild: !forceBuild };
     case "purge":
-      return { ...base, skipKill: true, skipInstall: true, skipBuild: true };
+      return { ...base, skipKill: true, skipInstall: true, skipBuild: !forceBuild };
     case "kill":
-      return { ...base, skipKill: false, skipInstall: true, skipBuild: true };
+      return { ...base, skipKill: false, skipInstall: true, skipBuild: !forceBuild };
     default:
       return base;
   }
@@ -107,10 +113,16 @@ export function App(props: AppProps) {
       const r = await runCool({ ...opts, onStep: (s) => setSteps([...s]) });
       setResult(r);
       setScreen("done");
+      // Boot a server after a successful pipeline when --dev/--prod was passed.
+      if (props.serverAfter && r.success) {
+        const cores = Math.max(1, Math.floor(totalCores / 2));
+        handleStartServer(cores, props.serverAfter);
+        return; // keep process alive; server screen owns lifecycle
+      }
+      if (mode !== "interactive") exit();
     } catch (e) {
       setError(String(e));
       setScreen("done");
-    } finally {
       if (mode !== "interactive") exit();
     }
   }
