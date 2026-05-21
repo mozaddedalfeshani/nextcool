@@ -36,18 +36,24 @@ Each command is a plain async function returning a typed result:
 
 | File | Function | Purpose |
 |------|----------|---------|
-| `cool.ts` | `runCool` | Orchestrates all 5 steps; accepts `skipKill/skipInstall/skipBuild` flags |
+| `cool.ts` | `runCool` | Orchestrates the pipeline; steps built dynamically from `skipKill/skipInstall/skipBuild` + optional `lint/format` |
 | `kill.ts` | `runKill` | Kills user-owned `node`/`next` processes via `ps-list` + `fkill` |
 | `clean.ts` | `runClean` | Removes paths in `PROJECT_TARGETS` / `FULL_TARGETS` |
 | `purge-cache.ts` | `runPurgeCache` | Runs PM-specific cache clean commands |
 | `reinstall.ts` | `runReinstall` | Runs PM install |
+| `lint.ts` | `runLint` | Runs `npx eslint .` (check-only); skips if eslint absent |
+| `format.ts` | `runFormat` | Runs `npx prettier --write .` then `--check .`; skips if prettier absent |
 | `rebuild.ts` | `runRebuild` | Runs `next build` (optionally `--no-turbo`, memory cap) |
 | `doctor.ts` | `runDoctor` | Reports RAM, disk, zombie count, Turbopack signals |
 | `run-server.ts` | `spawnServer` | Spawns `next dev/start` with CPU affinity (platform-specific) |
+| `action-runner.ts` | `runActionRunner` | Writes/removes `.github/workflows/nextcool.yml`; os auto-detect or `--linux/--windows/--mac` |
+
+`fullclean` = `cool` with `full + lint + format` enabled. `--dev`/`--prod` boot a server after a successful pipeline (`--prod` forces a build even in `clean` mode).
 
 ### Lib layer (`src/lib/`)
 
 - `detect-pm.ts` — detects package manager from lockfiles; `detectAllPms` returns all found (triggers `PmSelector` when >1)
+- `detect-tool.ts` — `hasEslint` / `hasPrettier`: true if dep in package.json OR a config file exists (drives lint/format skip)
 - `log-bus.ts` — singleton `EventEmitter` that buffers `{ stepId, text, ts }` lines; UI components subscribe for live log pane
 - `safe-rm.ts` — wrapper around `fs.rm` that measures reclaimed bytes
 - `exec.ts` — thin `execa` wrapper
