@@ -1,0 +1,66 @@
+name: nextcool
+description: "Next.js CI quality gate (typecheck + lint + format + build) with a build report and base-branch bundle diff."
+author: mozaddedalfeshani
+branding:
+  icon: wind
+  color: blue
+
+inputs:
+  cwd:
+    description: "Project directory to run against."
+    default: "."
+  node-version:
+    description: "Node.js version to set up."
+    default: "20"
+  report:
+    description: "Measure build time + bundle size and post a job-summary report."
+    default: "true"
+  fail-on-growth:
+    description: "Fail the run if the client bundle grows by ≥ this percent vs the base branch (0 = never)."
+    default: "0"
+  version:
+    description: "nextcool version to run via npx."
+    default: "latest"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    # On a PR, restore the base branch's report (saved by its own push run below)
+    # so the build report can show a per-metric delta and gate bundle growth.
+    - name: Restore base build report
+      if: ${{ github.event_name == 'pull_request' && inputs.report == 'true' }}
+      uses: actions/cache/restore@v4
+      with:
+        path: ${{ inputs.cwd }}/.nextcool-baseline.json
+        key: nextcool-report-${{ github.event.pull_request.base.sha }}
+
+    - name: nextcool ci
+      shell: bash
+      run: |
+        ARGS=(ci --cwd "${{ inputs.cwd }}")
+        BASE="${{ inputs.cwd }}/.nextcool-baseline.json"
+        if [ "${{ inputs.report }}" = "true" ]; then ARGS+=(--report); fi
+        if [ -f "$BASE" ]; then ARGS+=(--baseline "$BASE"); fi
+        if [ "${{ inputs.fail-on-growth }}" != "0" ]; then ARGS+=(--fail-on-growth "${{ inputs.fail-on-growth }}"); fi
+        npx --yes "nextcool@${{ inputs.version }}" "${ARGS[@]}"
+
+    # On push (e.g. to main after merge), cache this run's report keyed by its
+    # commit SHA so future PRs targeting it can diff against it.
+    - name: Save build report
+      if: ${{ github.event_name == 'push' && inputs.report == 'true' }}
+      uses: actions/cache/save@v4
+      with:
+        path: ${{ inputs.cwd }}/nextcool-report.json
+        key: nextcool-report-${{ github.sha }}
+
+    - name: Upload build report artifact
+      if: ${{ inputs.report == 'true' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: nextcool-report
+        path: ${{ inputs.cwd }}/nextcool-report.json
+        if-no-files-found: ignore

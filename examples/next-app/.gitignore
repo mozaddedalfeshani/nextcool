@@ -1,0 +1,5 @@
+node_modules/
+.next/
+package-lock.json
+nextcool-report.json
+.nextcool-baseline.json

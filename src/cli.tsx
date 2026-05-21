@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import type { CoolOptions } from "./commands/cool.js";
 import type { ServerMode } from "./commands/run-server.js";
 import { runActionRunner, type RunnerOs } from "./commands/action-runner.js";
+import { runCi } from "./commands/ci.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -149,7 +150,7 @@ addSharedOpts(
 
 program
   .command("action-runner")
-  .description("Generate a GitHub Actions workflow that runs `nextcool fullclean` in CI")
+  .description("Generate a GitHub Actions workflow that runs the nextcool ci quality gate")
   .option("--yes", "skip confirmations (CI mode)", false)
   .option("--cwd <path>", "target project directory", process.cwd())
   .option("--linux", "target ubuntu-latest runner", false)
@@ -197,6 +198,49 @@ program
           break;
       }
       process.exit(0);
+    }
+  );
+
+program
+  .command("ci")
+  .description("CI quality gate: install → typecheck → lint → format:check → build (plain output, real exit codes)")
+  .option("--cwd <path>", "target project directory", process.cwd())
+  .option("--skip-install", "skip dependency install (CI already installed)", false)
+  .option("--webpack", "build with --no-turbo (Turbopack workaround)", false)
+  .option("--memory <mb>", "set NODE_OPTIONS --max-old-space-size", (v) => parseInt(v, 10))
+  .option("--report", "measure build time + bundle size, emit a build report", false)
+  .option("--baseline <file>", "previous report JSON to diff against (base branch)")
+  .option("--report-out <file>", "where to write this run's report JSON", "nextcool-report.json")
+  .option("--fail-on-growth <pct>", "fail if client bundle grows by ≥ pct (needs --baseline)", (v) => parseFloat(v))
+  .option("--force", "run even outside a Next.js project", false)
+  .action(
+    async (_opts, cmd: Command) => {
+      // Read merged opts: the root program also declares --cwd/--force, which
+      // shadows the subcommand's local copies; optsWithGlobals resolves the
+      // value the user actually passed. (See README note on this Commander quirk.)
+      const opts = cmd.optsWithGlobals() as {
+        cwd: string;
+        skipInstall: boolean;
+        webpack: boolean;
+        memory?: number;
+        report: boolean;
+        baseline?: string;
+        reportOut: string;
+        failOnGrowth?: number;
+        force: boolean;
+      };
+      guardNextProject(opts.cwd, opts.force);
+      const result = await runCi({
+        cwd: opts.cwd,
+        skipInstall: opts.skipInstall,
+        webpack: opts.webpack,
+        memoryMb: opts.memory,
+        report: opts.report,
+        baseline: opts.baseline,
+        reportOut: opts.reportOut,
+        failOnGrowth: opts.failOnGrowth,
+      });
+      process.exit(result.exitCode);
     }
   );
 

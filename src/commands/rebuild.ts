@@ -13,6 +13,7 @@ export interface RebuildResult {
   exitCode: number;
   success: boolean;
   useWebpack: boolean;
+  durationMs: number;
 }
 
 export async function runRebuild(opts: RebuildOptions = {}): Promise<RebuildResult> {
@@ -30,13 +31,15 @@ export async function runRebuild(opts: RebuildOptions = {}): Promise<RebuildResu
 
   if (opts.dryRun) {
     logBus.push("rebuild", `[dry-run] Would run: next ${args.join(" ")}`);
-    return { exitCode: 0, success: true, useWebpack };
+    return { exitCode: 0, success: true, useWebpack, durationMs: 0 };
   }
 
+  const start = Date.now();
   const result = await runCmd("rebuild", resolveBin("npx"), ["next", ...args], {
     cwd: opts.cwd,
     env,
   });
+  const durationMs = Date.now() - start;
 
   if (result.exitCode !== 0) {
     logBus.push("rebuild", `Build failed (exit ${result.exitCode})`);
@@ -47,5 +50,5 @@ export async function runRebuild(opts: RebuildOptions = {}): Promise<RebuildResu
     logBus.push("rebuild", "Build complete");
   }
 
-  return { exitCode: result.exitCode, success: result.exitCode === 0, useWebpack };
+  return { exitCode: result.exitCode, success: result.exitCode === 0, useWebpack, durationMs };
 }

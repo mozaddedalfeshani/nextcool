@@ -38,18 +38,18 @@ function buildWorkflow(os: RunnerOs): string {
   return `name: nextcool
 on:
   push:
+  pull_request:
   workflow_dispatch:
 
 jobs:
-  build:
+  ci:
     runs-on: ${RUNNER_LABEL[os]}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: nextcool ci
+        uses: mozaddedalfeshani/nextcool@v2
         with:
-          node-version: 20
-      - name: nextcool fullclean
-        run: npx --yes nextcool fullclean --yes --force
+          report: "true"
 `;
 }
 
