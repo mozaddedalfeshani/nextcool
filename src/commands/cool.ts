@@ -3,6 +3,8 @@ import { runClean } from "./clean.js";
 import { runPurgeCache } from "./purge-cache.js";
 import { runReinstall } from "./reinstall.js";
 import { runRebuild } from "./rebuild.js";
+import { runLint } from "./lint.js";
+import { runFormat } from "./format.js";
 import { detectPm, type PackageManager } from "../lib/detect-pm.js";
 import { logBus } from "../lib/log-bus.js";
 
@@ -23,6 +25,8 @@ export interface CoolOptions {
   skipKill?: boolean;
   skipInstall?: boolean;
   skipBuild?: boolean;
+  lint?: boolean;
+  format?: boolean;
   cwd?: string;
   pm?: PackageManager;
   onStep?: (steps: StepState[]) => void;
@@ -47,6 +51,8 @@ export async function runCool(opts: CoolOptions = {}): Promise<CoolResult> {
     { id: "clean", label: "Remove build artifacts", status: "pending", detail: "" },
     { id: "purge", label: `Purge ${pm} cache`, status: "pending", detail: "" },
     { id: "install", label: "Reinstall dependencies", status: "pending", detail: "" },
+    ...(opts.lint ? [{ id: "lint", label: "Lint (eslint)", status: "pending" as StepStatus, detail: "" }] : []),
+    ...(opts.format ? [{ id: "format", label: "Format (prettier)", status: "pending" as StepStatus, detail: "" }] : []),
     { id: "build", label: "Rebuild project", status: "pending", detail: "" },
   ];
 
@@ -119,6 +125,38 @@ export async function runCool(opts: CoolOptions = {}): Promise<CoolResult> {
     }
   } else {
     setStep("install", "skipped", "");
+  }
+
+  // Step 4b: lint (eslint, check-only)
+  if (opts.lint) {
+    setStep("lint", "running", "running eslint...");
+    try {
+      const r = await runLint({ dryRun: opts.dryRun, cwd });
+      if (r.skipped) {
+        setStep("lint", "skipped", "eslint not found");
+      } else {
+        setStep("lint", r.success ? "done" : "error", r.success ? "clean" : `exit ${r.exitCode}`);
+      }
+    } catch (e) {
+      logBus.push("lint", `Error: ${String(e)}`);
+      setStep("lint", "error", String(e));
+    }
+  }
+
+  // Step 4c: format (prettier --write then --check)
+  if (opts.format) {
+    setStep("format", "running", "running prettier...");
+    try {
+      const r = await runFormat({ dryRun: opts.dryRun, cwd });
+      if (r.skipped) {
+        setStep("format", "skipped", "prettier not found");
+      } else {
+        setStep("format", r.success ? "done" : "error", r.success ? "formatted" : `exit ${r.exitCode}`);
+      }
+    } catch (e) {
+      logBus.push("format", `Error: ${String(e)}`);
+      setStep("format", "error", String(e));
+    }
   }
 
   // Step 5: rebuild

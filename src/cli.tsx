@@ -7,6 +7,8 @@ import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { CoolOptions } from "./commands/cool.js";
+import type { ServerMode } from "./commands/run-server.js";
+import { runActionRunner, type RunnerOs } from "./commands/action-runner.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -18,6 +20,18 @@ interface SharedOpts {
   memory?: number;
   cwd: string;
   force: boolean;
+  dev: boolean;
+  prod: boolean;
+}
+
+function resolveServerAfter(opts: SharedOpts): ServerMode | undefined {
+  if (opts.dev && opts.prod) {
+    console.error("\nError: --dev and --prod are mutually exclusive.\n");
+    process.exit(1);
+  }
+  if (opts.dev) return "dev";
+  if (opts.prod) return "start";
+  return undefined;
 }
 
 function getVersion(): string {
@@ -49,10 +63,13 @@ function addSharedOpts(cmd: Command): Command {
     .option("--webpack", "rebuild with --no-turbo (Turbopack workaround)", false)
     .option("--memory <mb>", "set NODE_OPTIONS --max-old-space-size", (v) => parseInt(v, 10))
     .option("--cwd <path>", "target project directory", process.cwd())
-    .option("--force", "run even outside a Next.js project", false);
+    .option("--force", "run even outside a Next.js project", false)
+    .option("--dev", "boot `next dev` after the pipeline completes", false)
+    .option("--prod", "boot `next start` after the pipeline completes", false);
 }
 
 function mount(mode: AppMode, opts: SharedOpts, extraCoolOpts: Partial<CoolOptions> = {}): void {
+  const serverAfter = resolveServerAfter(opts);
   const { waitUntilExit } = render(
     <App
       mode={mode}
@@ -61,6 +78,7 @@ function mount(mode: AppMode, opts: SharedOpts, extraCoolOpts: Partial<CoolOptio
       full={opts.full}
       webpack={opts.webpack}
       memoryMb={opts.memory}
+      serverAfter={serverAfter}
       {...extraCoolOpts}
     />,
     { exitOnCtrlC: true }
@@ -97,6 +115,15 @@ addSharedOpts(
 
 addSharedOpts(
   program
+    .command("fullclean")
+    .description("Deep reset: kill → wipe node_modules → reinstall → lint → prettier → rebuild")
+).action((opts: SharedOpts) => {
+  guardNextProject(opts.cwd, opts.force);
+  mount("fullclean", opts);
+});
+
+addSharedOpts(
+  program
     .command("clean")
     .description("Delete .next, .turbo, node_modules/.cache and other build artifacts")
 ).action((opts: SharedOpts) => {
@@ -121,6 +148,59 @@ addSharedOpts(
 });
 
 program
+  .command("action-runner")
+  .description("Generate a GitHub Actions workflow that runs `nextcool fullclean` in CI")
+  .option("--yes", "skip confirmations (CI mode)", false)
+  .option("--cwd <path>", "target project directory", process.cwd())
+  .option("--linux", "target ubuntu-latest runner", false)
+  .option("--windows", "target windows-latest runner", false)
+  .option("--mac", "target macos-latest runner", false)
+  .option("--install", "write the workflow file (default)", false)
+  .option("--uninstall", "remove the workflow file", false)
+  .action(
+    (opts: {
+      cwd: string;
+      linux: boolean;
+      windows: boolean;
+      mac: boolean;
+      install: boolean;
+      uninstall: boolean;
+    }) => {
+      const picked = [opts.linux, opts.windows, opts.mac].filter(Boolean).length;
+      if (picked > 1) {
+        console.error("\nError: pick at most one of --linux / --windows / --mac.\n");
+        process.exit(1);
+      }
+      const os: RunnerOs | undefined = opts.linux
+        ? "linux"
+        : opts.windows
+          ? "windows"
+          : opts.mac
+            ? "mac"
+            : undefined;
+
+      const result = runActionRunner({
+        cwd: opts.cwd,
+        os,
+        uninstall: opts.uninstall,
+      });
+
+      switch (result.action) {
+        case "installed":
+          console.log(`✓ Wrote workflow for ${result.os} → ${result.path}`);
+          break;
+        case "uninstalled":
+          console.log(`✓ Removed workflow → ${result.path}`);
+          break;
+        case "missing":
+          console.log(`No workflow to remove at ${result.path}`);
+          break;
+      }
+      process.exit(0);
+    }
+  );
+
+program
   .command("doctor")
   .description("Diagnose environment: RAM, disk, zombies, Turbopack issues")
   .option("--cwd <path>", "target project directory", process.cwd())
@@ -133,6 +213,8 @@ program
       webpack: false,
       cwd: opts.cwd,
       force: opts.force,
+      dev: false,
+      prod: false,
     });
   });
 
