@@ -27,8 +27,8 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: pnpm
 
-      - name: nextcool clean (dogfood)
-        run: npx --yes nextcool@latest clean --yes --force
+      - name: nextcool purge (dogfood)
+        run: npx --yes nextcool@latest purge --yes
 
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
