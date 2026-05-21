@@ -21,7 +21,7 @@ jobs:
           node-version: 20
           cache: pnpm
       - name: nextcool clean (dogfood)
-        run: npx --yes nextcool clean --yes --force
+        run: npx --yes nextcool@latest clean --yes --force
       - name: Install
         run: pnpm install --frozen-lockfile
       - name: Build
