@@ -125,6 +125,15 @@ addSharedOpts(
 
 addSharedOpts(
   program
+    .command("prep")
+    .description("[BETA] Prep code for commit: auto-fix + verify (eslint --fix, prettier, tsc) in parallel, then build")
+).action((opts: SharedOpts) => {
+  guardNextProject(opts.cwd, opts.force);
+  mount("prep", opts);
+});
+
+addSharedOpts(
+  program
     .command("clean")
     .description("Delete .next, .turbo, node_modules/.cache and other build artifacts")
 ).action((opts: SharedOpts) => {
