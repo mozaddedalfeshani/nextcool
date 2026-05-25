@@ -1,6 +1,6 @@
 # nextcool
 
-> Kill zombie node processes, purge caches, rebuild your Next.js project, run dev/prod server with CPU core limiting, and run a CI quality gate with build reports — stop your laptop overheating.
+> Kill zombie node processes, purge caches, rebuild your Next.js project, fix-and-verify your code before every commit, run dev/prod server with CPU core limiting, and run a CI quality gate with build reports — stop your laptop overheating.
 
 [![npm version](https://img.shields.io/npm/v/nextcool.svg)](https://www.npmjs.com/package/nextcool)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -21,7 +21,15 @@ Next.js + Turbopack is powerful, but it has known issues that torch your laptop:
 - **Zombie processes** — crashed `next dev` sessions leave `node` processes eating RAM
 - **Bloated caches** — stale `.next`, `.turbo`, `node_modules/.cache` and global PM caches
 
-`nextcool` fixes all of this in one command — and now also runs as a GitHub Action CI gate with bundle size tracking.
+`nextcool` fixes all of this in one command — plus a one-shot `prep` gate that fixes, verifies, and builds your code before you commit, and a GitHub Action CI gate with bundle size tracking.
+
+### ⚡ One command to ship clean code
+
+```bash
+npx nextcool prep
+```
+
+Before you commit, run this. It **auto-fixes** your code (eslint `--fix` + prettier `--write`), then **verifies** it (strict lint + format check + TypeScript) — all the slow checks run **in parallel**, so it finishes in a fraction of the time — and only then **builds**. If anything's wrong, it never spams your terminal mid-run: every task finishes, then you get one clean list of exactly what failed and why. Green output = safe to push.
 
 ### Install
 
@@ -48,6 +56,7 @@ Run from inside your Next.js project directory (or pass `--cwd <path>`).
 | Command | Description |
 |---------|-------------|
 | *(default — interactive menu)* | Choose Auto, Manual, Run Server, or Doctor with keyboard |
+| `prep` 🧪 | **Pre-commit gate (beta):** auto-fix (eslint `--fix` + prettier `--write`) → parallel verify (strict lint + format check + tsc) → build. Errors shown once at the end |
 | `cool` | Full pipeline: kill → clean → purge cache → reinstall → rebuild |
 | `fullclean` | Deep reset: kill → wipe `node_modules` → reinstall → lint → prettier → rebuild |
 | `clean` | Delete `.next`, `.turbo`, `node_modules/.cache`, `.swc`, etc. |
@@ -83,6 +92,9 @@ nextcool cool --full        # wipe everything and rebuild
 nextcool cool --webpack     # Apple Silicon / Turbopack fix
 nextcool cool --memory 4096 # cap Node.js at 4 GB RAM
 nextcool --dry-run          # preview without touching anything
+
+nextcool prep            # fix + verify (parallel) + build before commit
+nextcool prep --dry-run  # preview the commands prep would run
 
 nextcool clean --yes --dev  # clean, then boot `next dev`
 nextcool clean --yes --prod # clean, build, then boot `next start`
@@ -147,6 +159,33 @@ Kills every `node` / `next` process owned by the current user — clears zombies
 ```bash
 nextcool kill --yes
 ```
+
+---
+
+#### `prep` 🧪 beta
+
+> **Beta:** `prep` is new and still being tested. It's safe to use — non-destructive checks plus your own fixers — but the flags and output may change. [Report issues](https://github.com/mozaddedalfeshani/nextcool/issues) if you hit anything.
+
+The pre-commit one-shot: clean up your code, prove it's clean, then build — fast. Designed so the slow checks don't run one-after-another.
+
+**Phase 1 — auto-fix** (sequential, edits your files): `eslint . --fix` → `prettier --write .`
+**Phase 2 — verify** (parallel, read-only): `eslint . --max-warnings=0` + `prettier --check .` + `tsc --noEmit --incremental false`
+**Phase 3 — build:** `next build` — runs **only if every check passed**.
+
+Why phased? The fixers rewrite files; the checkers read them. Running both at once would race, so fixers go first, then the read-only checks run together for speed.
+
+Errors are **deferred**: nothing fails mid-run. Every task runs to completion, then a single red panel lists each failed task with its captured console output — so you read the failures once, at the end, instead of scrolling through interleaved noise. A live TUI shows each task's status (✓ / ✗ / spinner) while it runs.
+
+Tools are skipped automatically when absent: eslint/prettier when there's no dep or config, typecheck when there's no `tsconfig.json`.
+
+```bash
+nextcool prep              # fix + verify + build
+nextcool prep --dry-run    # show the commands, run nothing
+nextcool prep --webpack    # build with --no-turbo
+nextcool prep --memory 4096
+```
+
+> **Running in CI?** Use [`nextcool ci`](#ci--new) instead — it's the CI twin of `prep`: plain logs, real exit codes, and no file mutation (check-only). `prep` is for your local machine before you commit.
 
 ---
 
@@ -334,7 +373,15 @@ Next.js + Turbopack শক্তিশালী, কিন্তু এটি �
 - **জম্বি প্রসেস** — ক্র্যাশ হওয়া `next dev` সেশন থেকে `node` প্রসেস RAM খেতে থাকে
 - **ফোলা ক্যাশ** — পুরনো `.next`, `.turbo`, `node_modules/.cache` জমে থাকে
 
-`nextcool` একটি কমান্ডে সব ঠিক করে দেয় — এখন GitHub Action CI গেটও চালাতে পারে, বান্ডেল সাইজ ট্র্যাকিং সহ।
+`nextcool` একটি কমান্ডে সব ঠিক করে দেয় — সাথে `prep` গেট যা কমিটের আগে কোড ফিক্স, যাচাই ও build করে, এবং GitHub Action CI গেট, বান্ডেল সাইজ ট্র্যাকিং সহ।
+
+### ⚡ এক কমান্ডে ক্লিন কোড
+
+```bash
+npx nextcool prep
+```
+
+কমিট করার আগে এটি চালান। প্রথমে কোড **অটো-ফিক্স** করে (eslint `--fix` + prettier `--write`), তারপর **যাচাই** করে (strict lint + format check + TypeScript) — ধীর চেকগুলো **একসাথে (parallel)** চলে, তাই অনেক কম সময়ে শেষ হয় — আর সব ঠিক থাকলে তবেই **build** করে। কোনো সমস্যা হলে চলার মাঝে টার্মিনাল ভরিয়ে দেয় না: সব টাস্ক শেষ হওয়ার পর একবারে দেখায় ঠিক কোনটা কেন ফেল করেছে। সব সবুজ = নিশ্চিন্তে push করুন।
 
 ### ইনস্টল
 
@@ -361,6 +408,7 @@ nextcool [command] [options]
 | কমান্ড | কাজ |
 |--------|-----|
 | *(ডিফল্ট — মেনু)* | Auto, Manual, Run Server বা Doctor মোড বেছে নিন |
+| `prep` 🧪 | **প্রি-কমিট গেট (beta):** অটো-ফিক্স (eslint `--fix` + prettier `--write`) → parallel যাচাই (strict lint + format check + tsc) → build। এরর শেষে একবারে দেখায় |
 | `cool` | সম্পূর্ণ পাইপলাইন: kill → clean → cache মুছে → reinstall → rebuild |
 | `fullclean` | গভীর রিসেট: kill → `node_modules` মুছে → reinstall → lint → prettier → rebuild |
 | `clean` | `.next`, `.turbo`, `node_modules/.cache` মুছে ফেলে |
@@ -397,6 +445,9 @@ nextcool cool --webpack     # Apple Silicon / Turbopack সমস্যার �
 nextcool cool --memory 4096 # Node.js-কে ৪ GB RAM-এ সীমাবদ্ধ রাখুন
 nextcool --dry-run          # কিছু না করে শুধু দেখুন
 
+nextcool prep            # কমিটের আগে ফিক্স + যাচাই (parallel) + build
+nextcool prep --dry-run  # prep কী কী চালাবে শুধু দেখুন
+
 nextcool clean --yes --dev  # পরিষ্কার করে `next dev` চালু করুন
 nextcool clean --yes --prod # পরিষ্কার + build করে `next start` চালু করুন
 nextcool fullclean --yes    # node_modules মুছে → install → lint → prettier → build
@@ -428,6 +479,26 @@ nextcool cool --yes
 nextcool cool --webpack
 nextcool cool --memory 4096
 ```
+
+#### `prep` 🧪 beta
+
+> **Beta:** `prep` নতুন, এখনও টেস্ট চলছে। ব্যবহার নিরাপদ — শুধু চেক ও আপনার নিজের ফিক্সার — তবে flag ও আউটপুট পরিবর্তন হতে পারে। সমস্যা হলে [রিপোর্ট করুন](https://github.com/mozaddedalfeshani/nextcool/issues)।
+
+কমিটের আগের এক-শট: কোড পরিষ্কার করে, প্রমাণ করে যে পরিষ্কার, তারপর build — দ্রুত।
+
+**ধাপ ১ — অটো-ফিক্স** (ক্রমে, ফাইল বদলায়): `eslint . --fix` → `prettier --write .`
+**ধাপ ২ — যাচাই** (parallel, read-only): `eslint . --max-warnings=0` + `prettier --check .` + `tsc --noEmit --incremental false`
+**ধাপ ৩ — build:** `next build` — শুধু সব চেক পাস করলে চলে।
+
+ফিক্সাররা ফাইল লেখে, চেকাররা পড়ে — একসাথে চালালে দ্বন্দ্ব হতো, তাই আগে ফিক্স, পরে read-only চেকগুলো একসাথে (দ্রুততার জন্য)। এরর চলার মাঝে দেখায় না: সব টাস্ক শেষ হলে একটি লাল প্যানেলে প্রতিটি ফেল হওয়া টাস্ক ও তার আউটপুট একবারে দেখায়। চলার সময় লাইভ TUI প্রতিটি টাস্কের স্ট্যাটাস (✓ / ✗ / spinner) দেখায়। টুল না থাকলে (eslint/prettier/tsconfig) সেই ধাপ স্বয়ংক্রিয়ভাবে বাদ পড়ে।
+
+```bash
+nextcool prep              # ফিক্স + যাচাই + build
+nextcool prep --dry-run    # কমান্ডগুলো দেখায়, কিছু চালায় না
+nextcool prep --webpack    # --no-turbo দিয়ে build
+```
+
+> **CI-তে চালাবেন?** তাহলে [`nextcool ci`](#ci--new) ব্যবহার করুন — এটি `prep`-এর CI সংস্করণ: plain লগ, real exit code, ফাইল বদলায় না (শুধু চেক)। `prep` লোকাল মেশিনে কমিটের আগের জন্য।
 
 #### `fullclean`
 `cool`-এর চেয়ে গভীর রিসেট। `node_modules` মুছে, reinstall করে, তারপর **eslint → prettier → build** চালায়।
