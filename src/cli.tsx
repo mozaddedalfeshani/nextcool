@@ -130,11 +130,12 @@ addSharedOpts(
   program
     .command("prep")
     .description("[BETA] Prep code for commit: auto-fix + verify (eslint --fix, prettier, tsc) in parallel, then build")
-).action((opts: SharedOpts) => {
+    .option("--ci", "CI mode: skip auto-fix, run checks in parallel with plain output", false)
+).action((opts: SharedOpts & { ci: boolean }) => {
   guardNextProject(opts.cwd, opts.force);
   const isTTY = Boolean(process.stdin.isTTY) || Boolean(process.stdout.isTTY);
-  if (!isTTY || opts.yes) {
-    void runPrepPlain(opts);
+  if (opts.ci || !isTTY || opts.yes) {
+    void runPrepPlain(opts, opts.ci);
   } else {
     mount("prep", opts);
   }
@@ -279,8 +280,36 @@ program
     });
   });
 
-async function runPrepPlain(opts: SharedOpts): Promise<void> {
-  const onLine = (l: LogLine) => process.stdout.write(pc.dim(`    ${l.text}\n`));
+async function runPrepPlain(opts: SharedOpts, ci = false): Promise<void> {
+  // In CI mode: suppress per-line subprocess output (steps give enough signal).
+  // In non-TTY non-CI mode (auto-detected): stream all subprocess lines.
+  const prevStatus = new Map<string, string>();
+  const stepStart = new Map<string, number>();
+
+  const onLine = (l: LogLine) => {
+    if (!ci) process.stdout.write(pc.dim(`    ${l.text}\n`));
+  };
+
+  const onStep = (steps: import("./commands/cool.js").StepState[]) => {
+    for (const step of steps) {
+      const prev = prevStatus.get(step.id);
+      if (prev === step.status) continue;
+      prevStatus.set(step.id, step.status);
+
+      if (step.status === "running") {
+        stepStart.set(step.id, Date.now());
+        process.stdout.write(pc.cyan(`▶ ${step.label}\n`));
+      } else if (step.status === "done") {
+        const ms = Date.now() - (stepStart.get(step.id) ?? Date.now());
+        process.stdout.write(pc.green(`✓ ${step.label} — ${step.detail} (${(ms / 1000).toFixed(1)}s)\n`));
+      } else if (step.status === "error") {
+        const ms = Date.now() - (stepStart.get(step.id) ?? Date.now());
+        process.stdout.write(pc.red(`✗ ${step.label} — ${step.detail} (${(ms / 1000).toFixed(1)}s)\n`));
+      }
+      // skipped steps not printed — no noise for phase 1 skip in CI
+    }
+  };
+
   logBus.on("line", onLine);
   try {
     const result = await runPrep({
@@ -288,21 +317,20 @@ async function runPrepPlain(opts: SharedOpts): Promise<void> {
       dryRun: opts.dryRun,
       webpack: opts.webpack,
       memoryMb: opts.memory,
+      ci,
+      onStep,
     });
-    for (const step of result.steps) {
-      if (step.status === "done") {
-        process.stdout.write(pc.green(`✓ ${step.label} — ${step.detail}\n`));
-      } else if (step.status === "skipped") {
-        process.stdout.write(pc.yellow(`↓ ${step.label} — ${step.detail}\n`));
-      } else if (step.status === "error") {
-        process.stdout.write(pc.red(`✗ ${step.label} — ${step.detail}\n`));
+
+    if (result.failed.length > 0) {
+      for (const task of result.failed) {
+        process.stdout.write(pc.red(`\n✗ ${task.label} output:\n`));
+        for (const line of task.lines) {
+          process.stdout.write(`  ${line}\n`);
+        }
       }
     }
-    if (!result.success) {
-      process.stdout.write(pc.red(`\nprep failed\n`));
-    } else {
-      process.stdout.write(pc.green(`\nprep passed\n`));
-    }
+
+    process.stdout.write(result.success ? pc.green(`\nprep passed\n`) : pc.red(`\nprep failed\n`));
     process.exit(result.success ? 0 : 1);
   } finally {
     logBus.off("line", onLine);

@@ -325,7 +325,7 @@ Use nextcool as a one-line GitHub Actions step. It runs the `ci` quality gate, c
 # Pin to a specific version
 - uses: mozaddedalfeshani/nextcool@v2
   with:
-    version: "2.2.5"
+    version: "2.2.15"
 ```
 
 **Full workflow example:**

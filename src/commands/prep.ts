@@ -24,6 +24,7 @@ export interface PrepOptions {
   dryRun?: boolean;
   webpack?: boolean;
   memoryMb?: number;
+  ci?: boolean;
   onStep?: (steps: StepState[]) => void;
 }
 
@@ -66,6 +67,7 @@ function eslintSupportsConcurrency(cwd: string): boolean {
 export async function runPrep(opts: PrepOptions = {}): Promise<PrepResult> {
   const cwd = opts.cwd ?? process.cwd();
   const dryRun = opts.dryRun ?? false;
+  const ci = opts.ci ?? false;
   const start = Date.now();
   const npx = resolveBin("npx");
 
@@ -91,13 +93,19 @@ export async function runPrep(opts: PrepOptions = {}): Promise<PrepResult> {
   // Use all cores for eslint when the installed version supports it.
   const eslintConcurrency = eslintSupportsConcurrency(cwd) ? ["--concurrency=auto"] : [];
 
-  const steps: StepState[] = [
-    { id: "lint-fix", label: "Lint --fix (eslint)", status: "pending", detail: "" },
-    { id: "prettier-write", label: "Format --write (prettier)", status: "pending", detail: "" },
-    { id: "lint-strict", label: "Lint strict (max-warnings 0)", status: "pending", detail: "" },
-    { id: "prettier-check", label: "Format --check (prettier)", status: "pending", detail: "" },
-    { id: "typecheck", label: "Typecheck (tsc)", status: "pending", detail: "" },
-  ];
+  const steps: StepState[] = ci
+    ? [
+        { id: "lint-strict", label: "Lint strict (max-warnings 0)", status: "pending", detail: "" },
+        { id: "prettier-check", label: "Format --check (prettier)", status: "pending", detail: "" },
+        { id: "typecheck", label: "Typecheck (tsc)", status: "pending", detail: "" },
+      ]
+    : [
+        { id: "lint-fix", label: "Lint --fix (eslint)", status: "pending", detail: "" },
+        { id: "prettier-write", label: "Format --write (prettier)", status: "pending", detail: "" },
+        { id: "lint-strict", label: "Lint strict (max-warnings 0)", status: "pending", detail: "" },
+        { id: "prettier-check", label: "Format --check (prettier)", status: "pending", detail: "" },
+        { id: "typecheck", label: "Typecheck (tsc)", status: "pending", detail: "" },
+      ];
 
   function setStep(id: string, status: StepStatus, detail: string) {
     const step = steps.find((s) => s.id === id);
@@ -132,10 +140,12 @@ export async function runPrep(opts: PrepOptions = {}): Promise<PrepResult> {
     return ok;
   }
 
-  // Phase 1 — writers, sequential. prettier --write runs after eslint --fix so
-  // it formats the fixed output.
-  await runStep("lint-fix", eslint, ["eslint", lintTarget, "--fix", ...eslintConcurrency], "eslint not found");
-  await runStep("prettier-write", prettier, ["prettier", "--write", "."], "prettier not found");
+  // Phase 1 — writers, sequential. Skipped in CI mode (no mutations on runner).
+  // prettier --write runs after eslint --fix so it formats the fixed output.
+  if (!ci) {
+    await runStep("lint-fix", eslint, ["eslint", lintTarget, "--fix", ...eslintConcurrency], "eslint not found");
+    await runStep("prettier-write", prettier, ["prettier", "--write", "."], "prettier not found");
+  }
 
   // Phase 2 — read-only checks, parallel.
   await Promise.all([
