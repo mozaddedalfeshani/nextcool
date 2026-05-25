@@ -5,7 +5,6 @@ import { runCmd } from "../lib/exec.js";
 import { resolveBin } from "../lib/cmd.js";
 import { logBus } from "../lib/log-bus.js";
 import { hasEslint, hasPrettier } from "../lib/detect-tool.js";
-import { runRebuild } from "./rebuild.js";
 import type { StepState, StepStatus } from "./cool.js";
 
 /**
@@ -15,8 +14,6 @@ import type { StepState, StepStatus } from "./cool.js";
  *   eslint . --fix  →  prettier --write .
  * Phase 2 (checks, parallel — read-only, safe together):
  *   eslint . --max-warnings=0  +  prettier --check .  +  tsc --noEmit --incremental false
- * Phase 3 (build): next build, only if every check passed.
- *
  * Failures never abort early and are not highlighted mid-run: every task runs
  * to completion, and each failed task's console output is collected (via
  * logBus.getLines) so the UI can dump it all at the very end.
@@ -100,7 +97,6 @@ export async function runPrep(opts: PrepOptions = {}): Promise<PrepResult> {
     { id: "lint-strict", label: "Lint strict (max-warnings 0)", status: "pending", detail: "" },
     { id: "prettier-check", label: "Format --check (prettier)", status: "pending", detail: "" },
     { id: "typecheck", label: "Typecheck (tsc)", status: "pending", detail: "" },
-    { id: "build", label: "Build (next build)", status: "pending", detail: "" },
   ];
 
   function setStep(id: string, status: StepStatus, detail: string) {
@@ -147,26 +143,6 @@ export async function runPrep(opts: PrepOptions = {}): Promise<PrepResult> {
     runStep("prettier-check", prettier, ["prettier", "--check", "."], "prettier not found"),
     runStep("typecheck", tsconfig, ["tsc", "--noEmit", "--incremental", "false"], "no tsconfig.json"),
   ]);
-
-  // Phase 3 — build only if nothing failed.
-  const checksFailed = steps.some((s) => s.status === "error");
-  if (checksFailed) {
-    setStep("build", "skipped", "checks failed");
-  } else {
-    setStep("build", "running", "next build");
-    if (dryRun) {
-      logBus.push("build", "[dry-run] Would run: next build");
-      setStep("build", "skipped", "dry-run");
-    } else {
-      const r = await runRebuild({ cwd, webpack: opts.webpack, memoryMb: opts.memoryMb });
-      // runRebuild logs under "rebuild"; mirror those lines into "build" so the
-      // deferred error dump finds them under this step's id.
-      if (!r.success) {
-        for (const l of logBus.getLines("rebuild")) logBus.push("build", l.text);
-      }
-      setStep("build", r.success ? "done" : "error", r.success ? "complete" : `exit ${r.exitCode}`);
-    }
-  }
 
   // Collect console output for every failed step (deferred end-of-run dump).
   const failed: FailedTask[] = steps

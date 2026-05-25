@@ -12,7 +12,6 @@ interface PrepDashboardProps {
 
 const PHASE1 = ["lint-fix", "prettier-write"];
 const PHASE2 = ["lint-strict", "prettier-check", "typecheck"];
-const PHASE3 = ["build"];
 
 const STATUS_ICON: Record<StepStatus, string> = {
   pending: "·",
@@ -69,7 +68,6 @@ export function PrepDashboard({ steps, done, elapsedMs = 0 }: PrepDashboardProps
   const byId = (id: string) => steps.find((s) => s.id === id);
   const phase1 = PHASE1.map(byId).filter(Boolean) as StepState[];
   const phase2 = PHASE2.map(byId).filter(Boolean) as StepState[];
-  const phase3 = PHASE3.map(byId).filter(Boolean) as StepState[];
 
   const p2running = phase2.filter((s) => s.status === "running").length;
   const p2active = phase2.some((s) => s.status === "running");
@@ -110,19 +108,6 @@ export function PrepDashboard({ steps, done, elapsedMs = 0 }: PrepDashboardProps
       >
         {phase2.map((s, i) => (
           <Row key={s.id} step={s} branch={i === phase2.length - 1 ? "└─" : "├─"} />
-        ))}
-      </Box>
-
-      {/* Phase 3 — build */}
-      <Box marginTop={1}>
-        <Text color="cyan" bold>
-          ▸ Phase 3 · Build{"  "}
-        </Text>
-        <Text dimColor>only if all checks pass</Text>
-      </Box>
-      <Box flexDirection="column" borderStyle="single" borderColor="cyan" paddingX={1}>
-        {phase3.map((s) => (
-          <Row key={s.id} step={s} />
         ))}
       </Box>
 
