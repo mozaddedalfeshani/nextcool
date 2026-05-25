@@ -10,6 +10,9 @@ import type { CoolOptions } from "./commands/cool.js";
 import type { ServerMode } from "./commands/run-server.js";
 import { runActionRunner, type RunnerOs } from "./commands/action-runner.js";
 import { runCi } from "./commands/ci.js";
+import { runPrep } from "./commands/prep.js";
+import { logBus, type LogLine } from "./lib/log-bus.js";
+import pc from "picocolors";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -129,7 +132,12 @@ addSharedOpts(
     .description("[BETA] Prep code for commit: auto-fix + verify (eslint --fix, prettier, tsc) in parallel, then build")
 ).action((opts: SharedOpts) => {
   guardNextProject(opts.cwd, opts.force);
-  mount("prep", opts);
+  const isTTY = Boolean(process.stdin.isTTY) || Boolean(process.stdout.isTTY);
+  if (!isTTY || opts.yes) {
+    void runPrepPlain(opts);
+  } else {
+    mount("prep", opts);
+  }
 });
 
 addSharedOpts(
@@ -270,5 +278,35 @@ program
       prod: false,
     });
   });
+
+async function runPrepPlain(opts: SharedOpts): Promise<void> {
+  const onLine = (l: LogLine) => process.stdout.write(pc.dim(`    ${l.text}\n`));
+  logBus.on("line", onLine);
+  try {
+    const result = await runPrep({
+      cwd: opts.cwd,
+      dryRun: opts.dryRun,
+      webpack: opts.webpack,
+      memoryMb: opts.memory,
+    });
+    for (const step of result.steps) {
+      if (step.status === "done") {
+        process.stdout.write(pc.green(`✓ ${step.label} — ${step.detail}\n`));
+      } else if (step.status === "skipped") {
+        process.stdout.write(pc.yellow(`↓ ${step.label} — ${step.detail}\n`));
+      } else if (step.status === "error") {
+        process.stdout.write(pc.red(`✗ ${step.label} — ${step.detail}\n`));
+      }
+    }
+    if (!result.success) {
+      process.stdout.write(pc.red(`\nprep failed\n`));
+    } else {
+      process.stdout.write(pc.green(`\nprep passed\n`));
+    }
+    process.exit(result.success ? 0 : 1);
+  } finally {
+    logBus.off("line", onLine);
+  }
+}
 
 program.parse();
