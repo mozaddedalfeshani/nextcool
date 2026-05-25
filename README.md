@@ -1,6 +1,6 @@
 # nextcool
 
-> Fix your overheating Next.js dev environment and verify code before every commit.
+> Kill zombie node processes, purge caches, rebuild your Next.js project, fix-and-verify your code before every commit, run dev/prod server with CPU core limiting, and run a CI quality gate with build reports — stop your laptop overheating.
 
 [![npm version](https://img.shields.io/npm/v/nextcool.svg)](https://www.npmjs.com/package/nextcool)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
