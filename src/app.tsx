@@ -16,6 +16,8 @@ import {
   type CoolResult,
 } from "./commands/cool.js";
 import { runDoctor, type DoctorReport } from "./commands/doctor.js";
+import { runPrep, type PrepResult } from "./commands/prep.js";
+import { PrepErrors } from "./ui/PrepErrors.js";
 import { spawnServer, type ServerHandle, type ServerMode } from "./commands/run-server.js";
 import { detectPm, detectAllPms, detectNextVersion, isNextProject, type PackageManager, type DetectedPm } from "./lib/detect-pm.js";
 import os from "node:os";
@@ -29,7 +31,8 @@ export type AppMode =
   | "clean"
   | "purge"
   | "kill"
-  | "doctor";
+  | "doctor"
+  | "prep";
 
 type Screen =
   | "no-project"
@@ -96,6 +99,7 @@ export function App(props: AppProps) {
   const [steps, setSteps] = useState<StepState[]>([]);
   const [result, setResult] = useState<CoolResult | null>(null);
   const [doctorReport, setDoctorReport] = useState<DoctorReport | null>(null);
+  const [prepResult, setPrepResult] = useState<PrepResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [coolOpts, setCoolOpts] = useState<CoolOptions>(
     buildOptsFromMode(mode, props)
@@ -127,6 +131,26 @@ export function App(props: AppProps) {
     }
   }
 
+  async function startPrep() {
+    setScreen("running");
+    try {
+      const r = await runPrep({
+        cwd,
+        dryRun: props.dryRun,
+        webpack: props.webpack,
+        memoryMb: props.memoryMb,
+        onStep: (s) => setSteps([...s]),
+      });
+      setPrepResult(r);
+      setScreen("done");
+      if (mode !== "interactive") exit();
+    } catch (e) {
+      setError(String(e));
+      setScreen("done");
+      if (mode !== "interactive") exit();
+    }
+  }
+
   async function startDoctor() {
     setScreen("doctor-running");
     try {
@@ -148,6 +172,7 @@ export function App(props: AppProps) {
       setScreen("menu");
       setSteps([]);
       setResult(null);
+      setPrepResult(null);
       setError(null);
     } else if (screen === "doctor-done" && key.escape) {
       setScreen("menu");
@@ -166,6 +191,8 @@ export function App(props: AppProps) {
     if (mode !== "interactive") {
       if (mode === "doctor") {
         void startDoctor();
+      } else if (mode === "prep") {
+        void startPrep();
       } else {
         void startCool(buildOptsFromMode(mode, props));
       }
@@ -294,14 +321,25 @@ export function App(props: AppProps) {
         />
       )}
 
+      {mode === "prep" && (screen === "running" || screen === "done") && (
+        <Box marginTop={1}>
+          <Text backgroundColor="yellow" color="black" bold> BETA </Text>
+          <Text dimColor> prep is in testing — safe to use, please report issues</Text>
+        </Box>
+      )}
+
       {(screen === "running" || screen === "done") && (
         <ProgressDashboard
           steps={steps}
-          done={screen === "done" && result !== null}
+          done={screen === "done" && (result !== null || prepResult !== null)}
           totalReclaimedBytes={result?.totalReclaimedBytes}
           killedProcesses={result?.killedProcesses}
-          elapsedMs={result?.elapsedMs}
+          elapsedMs={result?.elapsedMs ?? prepResult?.elapsedMs}
         />
+      )}
+
+      {screen === "done" && prepResult && (
+        <PrepErrors failed={prepResult.failed} />
       )}
 
       {screen === "done" && mode === "interactive" && (
