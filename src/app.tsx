@@ -18,6 +18,7 @@ import {
 import { runDoctor, type DoctorReport } from "./commands/doctor.js";
 import { runPrep, type PrepResult } from "./commands/prep.js";
 import { PrepErrors } from "./ui/PrepErrors.js";
+import { PrepDashboard } from "./ui/PrepDashboard.js";
 import { spawnServer, type ServerHandle, type ServerMode } from "./commands/run-server.js";
 import { detectPm, detectAllPms, detectNextVersion, isNextProject, type PackageManager, type DetectedPm } from "./lib/detect-pm.js";
 import os from "node:os";
@@ -328,13 +329,21 @@ export function App(props: AppProps) {
         </Box>
       )}
 
-      {(screen === "running" || screen === "done") && (
+      {(screen === "running" || screen === "done") && mode === "prep" && (
+        <PrepDashboard
+          steps={steps}
+          done={screen === "done" && prepResult !== null}
+          elapsedMs={prepResult?.elapsedMs}
+        />
+      )}
+
+      {(screen === "running" || screen === "done") && mode !== "prep" && (
         <ProgressDashboard
           steps={steps}
-          done={screen === "done" && (result !== null || prepResult !== null)}
+          done={screen === "done" && result !== null}
           totalReclaimedBytes={result?.totalReclaimedBytes}
           killedProcesses={result?.killedProcesses}
-          elapsedMs={result?.elapsedMs ?? prepResult?.elapsedMs}
+          elapsedMs={result?.elapsedMs}
         />
       )}
 

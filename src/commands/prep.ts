@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import os from "node:os";
 import { runCmd } from "../lib/exec.js";
@@ -45,6 +45,27 @@ export interface PrepResult {
 
 const MAX_ERROR_LINES = 30;
 
+/**
+ * ESLint added `--concurrency` (multi-threaded linting across all cores) in
+ * v9.30. Older versions error on the unknown flag, so we only add it when the
+ * installed eslint is new enough — reading the real version from node_modules.
+ */
+function eslintSupportsConcurrency(cwd: string): boolean {
+  try {
+    const pkg = JSON.parse(
+      readFileSync(join(cwd, "node_modules", "eslint", "package.json"), "utf8")
+    ) as { version?: string };
+    const v = pkg.version ?? "";
+    const m = /^(\d+)\.(\d+)/.exec(v);
+    if (!m) return false;
+    const major = Number(m[1]);
+    const minor = Number(m[2]);
+    return major > 9 || (major === 9 && minor >= 30);
+  } catch {
+    return false;
+  }
+}
+
 export async function runPrep(opts: PrepOptions = {}): Promise<PrepResult> {
   const cwd = opts.cwd ?? process.cwd();
   const dryRun = opts.dryRun ?? false;
@@ -64,6 +85,14 @@ export async function runPrep(opts: PrepOptions = {}): Promise<PrepResult> {
   const eslint = hasEslint(cwd);
   const prettier = hasPrettier(cwd);
   const tsconfig = existsSync(join(cwd, "tsconfig.json"));
+
+  // Lint `src` when it exists, else `.`. Many flat ESLint configs only scope
+  // src/ and don't ignore root files (tailwind.config.ts, scripts/, etc), so
+  // `eslint .` floods false errors. prettier still runs on `.` (configs cover it).
+  const lintTarget = existsSync(join(cwd, "src")) ? "src" : ".";
+
+  // Use all cores for eslint when the installed version supports it.
+  const eslintConcurrency = eslintSupportsConcurrency(cwd) ? ["--concurrency=auto"] : [];
 
   const steps: StepState[] = [
     { id: "lint-fix", label: "Lint --fix (eslint)", status: "pending", detail: "" },
@@ -109,12 +138,12 @@ export async function runPrep(opts: PrepOptions = {}): Promise<PrepResult> {
 
   // Phase 1 — writers, sequential. prettier --write runs after eslint --fix so
   // it formats the fixed output.
-  await runStep("lint-fix", eslint, ["eslint", ".", "--fix"], "eslint not found");
+  await runStep("lint-fix", eslint, ["eslint", lintTarget, "--fix", ...eslintConcurrency], "eslint not found");
   await runStep("prettier-write", prettier, ["prettier", "--write", "."], "prettier not found");
 
   // Phase 2 — read-only checks, parallel.
   await Promise.all([
-    runStep("lint-strict", eslint, ["eslint", ".", "--max-warnings=0"], "eslint not found"),
+    runStep("lint-strict", eslint, ["eslint", lintTarget, "--max-warnings=0", ...eslintConcurrency], "eslint not found"),
     runStep("prettier-check", prettier, ["prettier", "--check", "."], "prettier not found"),
     runStep("typecheck", tsconfig, ["tsc", "--noEmit", "--incremental", "false"], "no tsconfig.json"),
   ]);

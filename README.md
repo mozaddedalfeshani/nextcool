@@ -31,6 +31,25 @@ npx nextcool prep
 
 Before you commit, run this. It **auto-fixes** your code (eslint `--fix` + prettier `--write`), then **verifies** it (strict lint + format check + TypeScript) — all the slow checks run **in parallel**, so it finishes in a fraction of the time — and only then **builds**. If anything's wrong, it never spams your terminal mid-run: every task finishes, then you get one clean list of exactly what failed and why. Green output = safe to push.
 
+**Delete the script sprawl.** No more hand-wiring `lint:fix`, `lint:strict`, `typecheck`, `format`, `format:check`, and a `fulltest` chain that runs them one-by-one:
+
+```jsonc
+// ❌ before — six scripts, run sequentially
+"lint:fix":     "eslint src --fix && prettier -w .",
+"lint:strict":  "eslint --max-warnings=0 src",
+"typecheck":    "tsc --noEmit --incremental false",
+"format":       "prettier -w .",
+"format:check": "prettier -c .",
+"fulltest":     "bun lint:fix && bun lint:strict && bun typecheck && bun format:check"
+```
+
+```jsonc
+// ✅ after — one command, checks run in parallel
+"prep": "nextcool prep"
+```
+
+prep auto-detects your tools: eslint targets `src/` when it exists (else `.`), prettier runs on `.`, typecheck is skipped without a `tsconfig.json`. Same commands your scripts ran — just parallelized, with errors batched to the end.
+
 ### Install
 
 ```bash
@@ -382,6 +401,25 @@ npx nextcool prep
 ```
 
 কমিট করার আগে এটি চালান। প্রথমে কোড **অটো-ফিক্স** করে (eslint `--fix` + prettier `--write`), তারপর **যাচাই** করে (strict lint + format check + TypeScript) — ধীর চেকগুলো **একসাথে (parallel)** চলে, তাই অনেক কম সময়ে শেষ হয় — আর সব ঠিক থাকলে তবেই **build** করে। কোনো সমস্যা হলে চলার মাঝে টার্মিনাল ভরিয়ে দেয় না: সব টাস্ক শেষ হওয়ার পর একবারে দেখায় ঠিক কোনটা কেন ফেল করেছে। সব সবুজ = নিশ্চিন্তে push করুন।
+
+**অনেকগুলো স্ক্রিপ্ট আর লিখতে হবে না।** `lint:fix`, `lint:strict`, `typecheck`, `format`, `format:check` আর একটা `fulltest` চেইন হাতে লেখার দরকার নেই:
+
+```jsonc
+// ❌ আগে — ছয়টা স্ক্রিপ্ট, একের পর এক চলে
+"lint:fix":     "eslint src --fix && prettier -w .",
+"lint:strict":  "eslint --max-warnings=0 src",
+"typecheck":    "tsc --noEmit --incremental false",
+"format":       "prettier -w .",
+"format:check": "prettier -c .",
+"fulltest":     "bun lint:fix && bun lint:strict && bun typecheck && bun format:check"
+```
+
+```jsonc
+// ✅ পরে — এক কমান্ড, চেক parallel-এ চলে
+"prep": "nextcool prep"
+```
+
+prep নিজে টুল শনাক্ত করে: src/ থাকলে eslint `src`-এ চলে (নাহলে `.`), prettier `.`-এ, `tsconfig.json` না থাকলে typecheck বাদ। আপনার স্ক্রিপ্টের একই কমান্ড — শুধু parallel, আর এরর শেষে একবারে।
 
 ### ইনস্টল
 
