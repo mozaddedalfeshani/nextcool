@@ -21,7 +21,7 @@ No test files exist yet — `pnpm test` will pass vacuously.
 
 ### Entry points
 
-- `bin/nextcool.js` → `dist/cli.js` (built from `src/cli.tsx`)
+- `dist/cli.js` — built from `src/cli.tsx`; shebang injected by tsup `banner`; pointed to directly from `package.json` `bin` (no shim layer)
 - `src/cli.tsx` — Commander program; parses flags, calls `render(<App>)` via Ink
 - `src/app.tsx` — Root Ink component; owns all screen state (`Screen` union type) and orchestrates commands
 
@@ -47,6 +47,8 @@ Each command is a plain async function returning a typed result:
 | `doctor.ts` | `runDoctor` | Reports RAM, disk, zombie count, Turbopack signals |
 | `run-server.ts` | `spawnServer` | Spawns `next dev/start` with CPU affinity (platform-specific) |
 | `action-runner.ts` | `runActionRunner` | Writes/removes `.github/workflows/nextcool.yml`; os auto-detect or `--linux/--windows/--mac` |
+| `prep.ts` | `runPrep` | Pre-commit quality pass: Phase 1 (eslint --fix → prettier --write, sequential); Phase 2 (lint strict + prettier --check + tsc --noEmit, parallel). `--ci` skips Phase 1. All steps run to completion; failures collected and dumped at end |
+| `ci.ts` | `runCi` | CI pipeline: install → typecheck → lint → format:check → build. Plain stdout (no Ink). Optional `--report` measures `.next` bundle size, writes JSON + GitHub Actions step summary. `--baseline` diffs against a previous report JSON; `--fail-on-growth N` gates on client bundle growth % |
 
 `fullclean` = `cool` with `full + lint + format` enabled. `--dev`/`--prod` boot a server after a successful pipeline (`--prod` forces a build even in `clean` mode).
 
@@ -54,7 +56,9 @@ Each command is a plain async function returning a typed result:
 
 - `detect-pm.ts` — detects package manager from lockfiles; `detectAllPms` returns all found (triggers `PmSelector` when >1)
 - `detect-tool.ts` — `hasEslint` / `hasPrettier`: true if dep in package.json OR a config file exists (drives lint/format skip)
-- `log-bus.ts` — singleton `EventEmitter` that buffers `{ stepId, text, ts }` lines; UI components subscribe for live log pane
+- `log-bus.ts` — singleton `EventEmitter` that buffers `{ stepId, text, ts }` lines; UI components subscribe for live log pane; `logBus.getLines(stepId)` retrieves buffered output for failed-step dump
+- `proc.ts` — `listNodeProcesses` (ps-list filtered to node/next patterns) + `killProcesses` (fkill, skips self PID); memory normalised to bytes cross-platform
+- `build-report.ts` — `measureBuildReport` (sizes `.next` + `.next/static`); `renderStepSummary` (markdown table with optional baseline diff); `appendStepSummary` (writes to `$GITHUB_STEP_SUMMARY`); `evaluateGrowth` (fails if client bundle grows ≥ N%)
 - `safe-rm.ts` — wrapper around `fs.rm` that measures reclaimed bytes
 - `exec.ts` — thin `execa` wrapper
 - `cmd.ts` — `resolveBin` for cross-platform binary resolution
@@ -70,7 +74,7 @@ All Ink/React components. `ProgressDashboard` subscribes to `logBus` for live ou
 
 ### Build
 
-tsup bundles `src/cli.tsx` → `dist/cli.js` (ESM, Node18 target). The `bin/nextcool.js` shim re-exports dist. `#!/usr/bin/env node` shebang is injected via tsup `banner`.
+tsup bundles `src/cli.tsx` → `dist/cli.js` (ESM, Node18 target). `#!/usr/bin/env node` shebang injected via tsup `banner`. `package.json` `bin` points directly to `dist/cli.js` — no intermediate shim (eliminates bun-on-Windows extraction failures).
 
 ### Platform notes
 

@@ -128,6 +128,32 @@ steps:
 
 macOS ✅ · Linux ✅ · Windows ✅ · WSL ✅
 
+#### Windows notes
+
+**Use `npx` or `bunx` in scripts — not a bare `nextcool` call.**
+Bun's global install on Windows can fail silently, leaving the binary registered but the package files missing. Scripts that call `nextcool` directly then break with `Cannot find module … bin\nextcool.js`.
+
+```json
+// package.json — safe on all platforms, no global install required
+"scripts": {
+  "prep":     "npx nextcool prep",
+  "fulltest": "npx nextcool prep"
+}
+```
+
+If you already installed globally with bun and see the `Cannot find module` error, reinstall:
+
+```powershell
+bun remove -g nextcool
+bun add -g nextcool
+```
+
+Or switch to npm/pnpm for the global install — they extract packages more reliably on Windows:
+
+```powershell
+npm install -g nextcool
+```
+
 ### Contributing
 
 ```bash
@@ -243,6 +269,32 @@ steps:
 ### প্ল্যাটফর্ম
 
 macOS ✅ · Linux ✅ · Windows ✅ · WSL ✅
+
+#### Windows-এ বিশেষ নোট
+
+**স্ক্রিপ্টে সরাসরি `nextcool` না লিখে `npx` বা `bunx` ব্যবহার করুন।**
+Windows-এ bun দিয়ে globally install করলে package files missing থাকতে পারে, তখন `Cannot find module … bin\nextcool.js` error আসে।
+
+```json
+// package.json — সব platform-এ নিরাপদ
+"scripts": {
+  "prep":     "npx nextcool prep",
+  "fulltest": "npx nextcool prep"
+}
+```
+
+বun দিয়ে globally install করা থাকলে এবং error আসলে reinstall করুন:
+
+```powershell
+bun remove -g nextcool
+bun add -g nextcool
+```
+
+অথবা npm/pnpm দিয়ে install করুন — Windows-এ এগুলো বেশি নির্ভরযোগ্য:
+
+```powershell
+npm install -g nextcool
+```
 
 ### কন্ট্রিবিউট
 
