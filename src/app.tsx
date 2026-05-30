@@ -23,7 +23,7 @@ import { spawnServer, type ServerHandle, type ServerMode } from "./commands/run-
 import { detectPm, detectAllPms, detectNextVersion, isNextProject, type PackageManager, type DetectedPm } from "./lib/detect-pm.js";
 import os from "node:os";
 
-const VERSION = "2.2.15";
+const VERSION = "2.2.17";
 
 export type AppMode =
   | "interactive"   // show main menu
