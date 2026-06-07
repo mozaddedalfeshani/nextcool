@@ -166,7 +166,27 @@ Reports are JSON (`nextcool-report.json`, v2). v1 Next.js-only reports still wor
 
 macOS ✅ · Linux ✅ · Windows ✅ · WSL ✅
 
-**Windows Note:** Use `npx nextcool` in scripts, not bare `nextcool`.
+**Windows Note:** Use `npx nextcool` or `bun x nextcool` in scripts, not bare `nextcool`.
+
+#### Troubleshooting: `Cannot find module ... dist/cli.js`
+
+The CLI binary lives in `dist/cli.js`, which is **built output** (not committed to git). If you see this on Windows:
+
+```powershell
+# From a git clone / local dev
+cd nextcool
+bun install          # runs prepare → builds dist/
+node dist/cli.js     # verify: should print version
+
+# If you linked globally before building, re-link after build:
+bun link
+
+# Or remove a broken global install and use the registry package:
+bun remove -g nextcool
+bun x nextcool@latest
+```
+
+Publishing to npm always runs `prepublishOnly`, so installs from the registry include `dist/`.
 
 ---
 
@@ -251,7 +271,11 @@ pnpm add -g nextcool
 }
 ```
 
-**💡 Windows:** স্ক্রিপ্টে সবসময় `npx nextcool` ব্যবহার করুন।
+**💡 Windows:** স্ক্রিপ্টে সবসময় `npx nextcool` বা `bun x nextcool` ব্যবহার করুন।
+
+#### `dist/cli.js` not found?
+
+Git clone থেকে চালালে আগে build দরকার — `bun install` (auto build) অথবা `bun run build`। Global link করার আগে build নিশ্চিত করুন। ভাঙা global install থাকলে: `bun remove -g nextcool` তারপর `bun x nextcool@latest`।
 
 ---
 
