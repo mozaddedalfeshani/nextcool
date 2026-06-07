@@ -1,6 +1,13 @@
 import { execa } from "execa";
 import { logBus } from "../lib/log-bus.js";
 import { tryWhich } from "../lib/system.js";
+import { resolveBin } from "../lib/cmd.js";
+import {
+  detectFramework,
+  resolveDevCommand,
+  resolveProdCommand,
+  type ResolvedCommand,
+} from "../lib/detect-framework.js";
 
 export type ServerMode = "dev" | "start";
 
@@ -14,29 +21,58 @@ export interface RunServerOptions {
 export interface ServerHandle {
   pid: number | undefined;
   stop: () => Promise<void>;
+  label: string;
+}
+
+function wrapWithAffinity(
+  resolved: ResolvedCommand,
+  cores: number
+): { cmd: string; args: string[]; env: NodeJS.ProcessEnv } {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+  const bin = resolveBin(resolved.cmd);
+  const baseArgs = resolved.args;
+
+  if (process.platform === "linux" && tryWhich("taskset")) {
+    return {
+      cmd: "taskset",
+      args: ["-c", `0-${Math.max(0, cores - 1)}`, bin, ...baseArgs],
+      env,
+    };
+  }
+
+  if (process.platform === "darwin" || process.platform === "linux") {
+    env["UV_THREADPOOL_SIZE"] = String(cores);
+    return { cmd: "nice", args: ["-n", "10", bin, ...baseArgs], env };
+  }
+
+  return {
+    cmd: "cmd.exe",
+    args: ["/c", bin, ...baseArgs],
+    env,
+  };
 }
 
 export function spawnServer(opts: RunServerOptions): ServerHandle {
   const stepId = opts.stepId ?? "server";
   const cwd = opts.cwd ?? process.cwd();
   const { cores, mode } = opts;
+  const info = detectFramework(cwd);
 
-  let cmd: string;
-  let args: string[];
-  const env: NodeJS.ProcessEnv = { ...process.env };
+  const resolved =
+    mode === "dev" ? resolveDevCommand(cwd) : resolveProdCommand(cwd);
 
-  if (process.platform === "linux" && tryWhich("taskset")) {
-    cmd = "taskset";
-    args = ["-c", `0-${Math.max(0, cores - 1)}`, "npx", "next", mode];
-  } else if (process.platform === "darwin" || process.platform === "linux") {
-    cmd = "nice";
-    args = ["-n", "10", "npx", "next", mode];
-    env["UV_THREADPOOL_SIZE"] = String(cores);
-  } else {
-    // Windows: .cmd scripts must run inside cmd.exe
-    cmd = "cmd.exe";
-    args = ["/c", "npx", "next", mode];
+  if (!resolved) {
+    logBus.push(stepId, `No ${mode} server command for ${info.label}. Add a "${mode === "dev" ? "dev" : "start"}" script to package.json.`);
+    return {
+      pid: undefined,
+      label: info.label,
+      async stop() {},
+    };
   }
+
+  const { cmd, args, env } = resolved.viaScript
+    ? { cmd: resolved.cmd, args: resolved.args, env: { ...process.env } as NodeJS.ProcessEnv }
+    : wrapWithAffinity(resolved, cores);
 
   const proc = execa(cmd, args, {
     cwd,
@@ -51,8 +87,7 @@ export function spawnServer(opts: RunServerOptions): ServerHandle {
     }
   });
 
-  // Windows: walk process tree rooted at cmd.exe and apply affinity to all descendants.
-  // 3s delay gives Next.js time to spawn turbopack/router workers before we pin them.
+  // Windows: walk process tree and apply affinity to all descendants.
   if (process.platform === "win32" && proc.pid) {
     const mask = (1 << cores) - 1;
     const rootPid = proc.pid;
@@ -66,6 +101,7 @@ export function spawnServer(opts: RunServerOptions): ServerHandle {
     get pid() {
       return proc.pid;
     },
+    label: info.label,
     async stop() {
       if (proc.pid) {
         try {

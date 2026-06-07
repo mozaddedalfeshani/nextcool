@@ -50,6 +50,4 @@ export function detectNextVersion(cwd = process.cwd()): string | null {
   }
 }
 
-export function isNextProject(cwd = process.cwd()): boolean {
-  return detectNextVersion(cwd) !== null;
-}
+export { isReactProject, isNextProject } from "./detect-framework.js";

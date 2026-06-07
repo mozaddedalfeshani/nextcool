@@ -1,6 +1,6 @@
 import { safeRm } from "../lib/safe-rm.js";
 import { logBus } from "../lib/log-bus.js";
-import { PROJECT_TARGETS, FULL_TARGETS } from "../config/targets.js";
+import { getCleanTargets } from "../lib/detect-framework.js";
 import { formatBytes } from "../lib/system.js";
 
 export interface CleanOptions {
@@ -17,7 +17,10 @@ export interface CleanResult {
 
 export async function runClean(opts: CleanOptions = {}): Promise<CleanResult> {
   const cwd = opts.cwd ?? process.cwd();
-  const targets = opts.full ? FULL_TARGETS : PROJECT_TARGETS;
+  const baseTargets = getCleanTargets(cwd);
+  const targets = opts.full
+    ? [...baseTargets, { rel: "node_modules", label: "node_modules" }]
+    : baseTargets;
   const removed: string[] = [];
   let totalBytes = 0;
 

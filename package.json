@@ -1,7 +1,7 @@
 {
   "name": "nextcool",
   "version": "2.2.19",
-  "description": "Kill zombie node processes, purge caches, rebuild Next.js — stop laptop overheating.",
+  "description": "Kill zombie node processes, purge caches, rebuild React projects — stop laptop overheating.",
   "type": "module",
   "bin": {
     "nextcool": "dist/cli.js"
@@ -22,10 +22,15 @@
     "node": ">=18.18.0"
   },
   "keywords": [
+    "react",
     "nextjs",
+    "vite",
+    "expo",
+    "react-native",
+    "electron",
+    "remix",
     "cache",
     "cleanup",
-    "turbopack",
     "performance",
     "cli",
     "developer-tools"

@@ -2,7 +2,7 @@ import React from "react";
 import { render } from "ink";
 import { Command } from "commander";
 import { App, type AppMode } from "./app.js";
-import { isNextProject } from "./lib/detect-pm.js";
+import { isReactProject } from "./lib/detect-framework.js";
 import { readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -49,11 +49,12 @@ function getVersion(): string {
   }
 }
 
-function guardNextProject(cwd: string, force: boolean): void {
-  if (!isNextProject(cwd) && !force) {
+function guardReactProject(cwd: string, force: boolean): void {
+  if (!isReactProject(cwd) && !force) {
     console.error(
-      "\nError: Not a Next.js project (no `next` dep in package.json).\n" +
-        "Run with --force to override, or cd into your Next.js project first.\n"
+      "\nError: Not a React project (no `react` or framework dep in package.json).\n" +
+        "Supported: Next.js, Vite, Remix, Expo, React Native, Electron, Gatsby, Astro, CRA.\n" +
+        "Run with --force to override, or cd into your project first.\n"
     );
     process.exit(1);
   }
@@ -67,9 +68,9 @@ function addSharedOpts(cmd: Command): Command {
     .option("--webpack", "rebuild with --no-turbo (Turbopack workaround)", false)
     .option("--memory <mb>", "set NODE_OPTIONS --max-old-space-size", (v) => parseInt(v, 10))
     .option("--cwd <path>", "target project directory", process.cwd())
-    .option("--force", "run even outside a Next.js project", false)
-    .option("--dev", "boot `next dev` after the pipeline completes", false)
-    .option("--prod", "boot `next start` after the pipeline completes", false);
+    .option("--force", "run even outside a React project", false)
+    .option("--dev", "boot dev server after the pipeline completes", false)
+    .option("--prod", "boot production server after the pipeline completes", false);
 }
 
 function mount(mode: AppMode, opts: SharedOpts, extraCoolOpts: Partial<CoolOptions> = {}): void {
@@ -95,7 +96,7 @@ function mount(mode: AppMode, opts: SharedOpts, extraCoolOpts: Partial<CoolOptio
 
 const program = new Command()
   .name("nextcool")
-  .description("Kill zombie node processes, purge caches, rebuild Next.js. Beat the heat.")
+  .description("Kill zombie node processes, purge caches, rebuild React projects. Beat the heat.")
   .version(getVersion(), "-v, --version");
 
 // Default: no subcommand → interactive TUI menu (or auto-cool in non-TTY/CI)
@@ -103,7 +104,7 @@ addSharedOpts(program).action((opts: SharedOpts) => {
   const isTTY = Boolean(process.stdin.isTTY) || Boolean(process.stdout.isTTY);
   const mode: AppMode = isTTY && !opts.yes ? "interactive" : "cool";
   if (!isTTY || opts.yes) {
-    guardNextProject(opts.cwd, opts.force);
+    guardReactProject(opts.cwd, opts.force);
   }
   mount(mode, opts);
 });
@@ -113,7 +114,7 @@ addSharedOpts(
     .command("cool")
     .description("Full pipeline: kill → clean → purge PM cache → reinstall → rebuild (non-interactive)")
 ).action((opts: SharedOpts) => {
-  guardNextProject(opts.cwd, opts.force);
+  guardReactProject(opts.cwd, opts.force);
   mount("cool", opts);
 });
 
@@ -122,7 +123,7 @@ addSharedOpts(
     .command("fullclean")
     .description("Deep reset: kill → wipe node_modules → reinstall → lint → prettier → rebuild")
 ).action((opts: SharedOpts) => {
-  guardNextProject(opts.cwd, opts.force);
+  guardReactProject(opts.cwd, opts.force);
   mount("fullclean", opts);
 });
 
@@ -132,7 +133,7 @@ addSharedOpts(
     .description("[BETA] Prep code for commit: auto-fix + verify (eslint --fix, prettier, tsc) in parallel, then build")
     .option("--ci", "CI mode: skip auto-fix, run checks in parallel with plain output", false)
 ).action((opts: SharedOpts & { ci: boolean }) => {
-  guardNextProject(opts.cwd, opts.force);
+  guardReactProject(opts.cwd, opts.force);
   const isTTY = Boolean(process.stdin.isTTY) || Boolean(process.stdout.isTTY);
   if (opts.ci || !isTTY || opts.yes) {
     void runPrepPlain(opts, opts.ci);
@@ -144,9 +145,9 @@ addSharedOpts(
 addSharedOpts(
   program
     .command("clean")
-    .description("Delete .next, .turbo, node_modules/.cache and other build artifacts")
+    .description("Delete build caches and framework output dirs (.next, dist, .vite, …)")
 ).action((opts: SharedOpts) => {
-  guardNextProject(opts.cwd, opts.force);
+  guardReactProject(opts.cwd, opts.force);
   mount("clean", opts);
 });
 
@@ -230,7 +231,7 @@ program
   .option("--baseline <file>", "previous report JSON to diff against (base branch)")
   .option("--report-out <file>", "where to write this run's report JSON", "nextcool-report.json")
   .option("--fail-on-growth <pct>", "fail if client bundle grows by ≥ pct (needs --baseline)", (v) => parseFloat(v))
-  .option("--force", "run even outside a Next.js project", false)
+  .option("--force", "run even outside a React project", false)
   .action(
     async (_opts, cmd: Command) => {
       // Read merged opts: the root program also declares --cwd/--force, which
@@ -247,7 +248,7 @@ program
         failOnGrowth?: number;
         force: boolean;
       };
-      guardNextProject(opts.cwd, opts.force);
+      guardReactProject(opts.cwd, opts.force);
       const result = await runCi({
         cwd: opts.cwd,
         skipInstall: opts.skipInstall,
@@ -266,7 +267,7 @@ program
   .command("doctor")
   .description("Diagnose environment: RAM, disk, zombies, Turbopack issues")
   .option("--cwd <path>", "target project directory", process.cwd())
-  .option("--force", "skip Next.js project check", false)
+  .option("--force", "run even outside a React project", false)
   .action((opts: { cwd: string; force: boolean }) => {
     mount("doctor", {
       dryRun: false,

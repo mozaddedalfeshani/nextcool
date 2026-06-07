@@ -1,6 +1,6 @@
 # nextcool
 
-> 🔥 **Stop your laptop overheating.** Kill zombie node processes, purge caches, rebuild your Next.js project, fix-and-verify your code before every commit, run dev/prod servers with CPU core limiting, measure bundle size, and run CI quality gates with build reports.
+> 🔥 **Stop your laptop overheating.** Kill zombie node processes, purge caches, rebuild your React project — Next.js, Vite, Expo, React Native, Electron, Remix, Gatsby, Astro, CRA, and more. Fix-and-verify code before every commit, run dev/prod servers with CPU core limiting, measure bundle size, and run CI quality gates with build reports.
 
 [![npm version](https://img.shields.io/npm/v/nextcool.svg)](https://www.npmjs.com/package/nextcool)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -14,11 +14,12 @@
 ## 🚀 Features at a Glance
 
 ✅ **One-Click Cleanup** — Kill zombies, wipe caches, reinstall deps, rebuild  
+✅ **Multi-Framework** — Auto-detects Next.js, Vite, Expo, Electron, Remix, and more  
 ✅ **Pre-Commit Quality** — Auto-fix + verify code in 30 seconds  
 ✅ **CI Quality Gate** — Full pipeline with real exit codes  
-✅ **Bundle Tracking** — Measure, diff, fail on growth  
-✅ **CPU Limiting** — Run servers with CPU affinity  
-✅ **Smart Diagnostics** — Check RAM, disk, zombies, Turbopack  
+✅ **Bundle Tracking** — Measure, diff, fail on growth (`.next`, `dist`, etc.)  
+✅ **CPU Limiting** — Run dev/prod servers with CPU affinity  
+✅ **Smart Diagnostics** — Check RAM, disk, zombies, framework + Turbopack (Next.js)  
 ✅ **GitHub Actions Ready** — Official Action + CLI  
 ✅ **Cross-Platform** — macOS, Linux, Windows, WSL  
 
@@ -30,13 +31,34 @@
 
 **The Problem:**
 - Dev server crashes → you kill the process manually
-- Cache is corrupted → you manually rm -rf `.next` and `.turbo`
-- Dependencies conflict → you manually npm install
+- Cache is corrupted → you manually `rm -rf .next`, `dist`, `.vite`, `.turbo`…
+- Dependencies conflict → you manually reinstall
 - Code quality → you check linting before push (slow!)
 - Bundle size grows → you have no idea until CI fails
-- Laptop melting → you blame Next.js (it's the dev server hogging CPU)
+- Laptop melting → it's the dev server hogging CPU (Next.js, Vite, Metro, Expo…)
 
 **nextcool fixes all of this in ONE command.**
+
+---
+
+### Supported Frameworks
+
+nextcool reads `package.json` and picks the right clean targets, build command, and dev/prod server automatically. Prefer `npm run build` / `npm run dev` when those scripts exist.
+
+| Framework | Detected via | Clean targets (examples) | Build fallback |
+|-----------|--------------|--------------------------|----------------|
+| **Next.js** | `next` | `.next`, `.turbo`, `.swc` | `next build` |
+| **Vite** | `vite` | `dist`, `.vite` | `vite build` |
+| **Remix** | `@remix-run/node` / `remix` | `build`, `.cache` | `remix build` |
+| **Expo** | `expo` | `.expo` | `expo export` |
+| **React Native** | `react-native` | shared caches | `react-native bundle` |
+| **Electron** | `electron` | `dist`, `out`, `release` | `electron-builder` |
+| **Gatsby** | `gatsby` | `.cache` | `gatsby build` |
+| **Astro** | `astro` | `dist`, `.astro` | `astro build` |
+| **CRA** | `react-scripts` | `build` | `react-scripts build` |
+| **Generic React** | `react` (no framework) | `dist` | `npm run build` |
+
+Any project with `react` or a framework dependency works. Use `--force` to run outside a detected React project.
 
 ---
 
@@ -44,16 +66,16 @@
 
 | Command | Purpose |
 |---------|---------|
-| **Interactive** | `npx nextcool` - TUI menu to pick what to run |
-| **PREP** | `npx nextcool prep` - Auto-fix + verify code (before commit) |
-| **COOL** | `npx nextcool cool` - Full pipeline: kill → clean → rebuild |
-| **FULLCLEAN** | `npx nextcool fullclean` - Deep reset + lint + format |
-| **CI** | `npx nextcool ci` - Quality gate + build report |
-| **CLEAN** | `npx nextcool clean` - Delete `.next`, `.turbo`, caches |
-| **KILL** | `npx nextcool kill` - Kill zombie processes |
-| **PURGE** | `npx nextcool purge` - Clear PM cache (bun/pnpm/npm/yarn) |
-| **DOCTOR** | `npx nextcool doctor` - Check RAM, disk, zombies, Turbopack |
-| **ACTION-RUNNER** | `npx nextcool action-runner` - GitHub Actions workflow setup |
+| **Interactive** | `npx nextcool` — TUI menu to pick what to run |
+| **PREP** | `npx nextcool prep` — Auto-fix + verify code (before commit) |
+| **COOL** | `npx nextcool cool` — Full pipeline: kill → clean → rebuild |
+| **FULLCLEAN** | `npx nextcool fullclean` — Deep reset + lint + format |
+| **CI** | `npx nextcool ci` — Quality gate + build report |
+| **CLEAN** | `npx nextcool clean` — Delete framework caches (`.next`, `dist`, `.vite`, …) |
+| **KILL** | `npx nextcool kill` — Kill zombie node processes |
+| **PURGE** | `npx nextcool purge` — Clear PM cache (bun/pnpm/npm/yarn) |
+| **DOCTOR** | `npx nextcool doctor` — Check RAM, disk, zombies, detected framework |
+| **ACTION-RUNNER** | `npx nextcool action-runner` — GitHub Actions workflow setup |
 
 ---
 
@@ -67,7 +89,7 @@ npx nextcool prep --yes
 - **Phase 1** (fixes): `eslint --fix` → `prettier --write`
 - **Phase 2** (checks): `eslint --strict` + `prettier --check` + `tsc --noEmit` (parallel)
 
-Perfect before every commit.
+Perfect before every commit — works on any React/TypeScript project.
 
 ---
 
@@ -77,12 +99,25 @@ Perfect before every commit.
 --yes              # Skip confirmations
 --dry-run          # Show what would happen
 --full             # Also delete node_modules
---webpack          # Use --no-turbo
+--webpack          # Next.js only: use --no-turbo (Turbopack workaround)
 --memory 4096      # Cap Node at 4 GB
 --cwd ./path       # Target directory
---dev              # Boot `next dev` after
---prod             # Boot `next start` after
+--force            # Run even outside a React project
+--dev              # Boot dev server after pipeline (framework-aware)
+--prod             # Boot production server after pipeline (framework-aware)
 ```
+
+**Dev/prod server examples by framework:**
+
+| Framework | `--dev` | `--prod` |
+|-----------|---------|----------|
+| Next.js | `next dev` | `next start` |
+| Vite | `vite` | `vite preview` |
+| Expo | `expo start` | `expo start --no-dev` |
+| Remix | `remix dev` | `remix-serve build` |
+| CRA | `react-scripts start` | uses `start` script |
+
+Uses `package.json` scripts when present (`dev`, `start`, `preview`).
 
 ---
 
@@ -93,7 +128,7 @@ Perfect before every commit.
 npx nextcool prep --yes
 ```
 
-#### Dev Server Stuck
+#### Dev Server Stuck (any React stack)
 ```bash
 npx nextcool cool --yes
 ```
@@ -115,6 +150,16 @@ steps:
   - run: bun x nextcool ci --report --fail-on-growth 5
 ```
 
+#### Build Report (framework-aware)
+
+`nextcool ci --report` measures build output size after the detected framework's build:
+
+- **Next.js** — `.next` and `.next/static` (client bundle)
+- **Vite / Remix / Astro / Electron** — `dist` and `dist/assets`
+- **Other** — primary output dir for that stack
+
+Reports are JSON (`nextcool-report.json`, v2). v1 Next.js-only reports still work as baselines.
+
 ---
 
 ### 🪟 Platform Support
@@ -130,7 +175,7 @@ macOS ✅ · Linux ✅ · Windows ✅ · WSL ✅
 ```bash
 git clone https://github.com/mozaddedalfeshani/nextcool
 cd nextcool
-pnpm install && pnpm dev
+bun install && bun run dev
 ```
 
 ---
@@ -147,41 +192,56 @@ MIT © [mozaddedalfeshani](https://github.com/mozaddedalfeshani)
 
 **সমস্যা:**
 - Dev সার্ভার ক্র্যাশ করে → হাতে হাতে প্রসেস কিল করতে হয়
-- ক্যাশ করাপ্ট → `.next`/`.turbo` ডিলিট করতে হয়
-- ডিপেনডেন্সি ভেঙে যায় → বারবার install করতে হয়
-- কোড কোয়ালিটি চেক → push এর আগে ধীরগতিতে lint চেক
-- বান্ডল সাইজ বাড়ে → CI ফেল না হওয়া পর্যন্ত বোঝা যায় না
-- ল্যাপটপ গরম হয় → আসলে dev সার্ভার অতিরিক্ত CPU ব্যবহার করে
+- ক্যাশ corrupt → `.next`, `dist`, `.vite`, `.turbo` ইত্যাদি ম্যানুয়ালি মুছতে হয়
+- Dependency conflict → বারবার install করতে হয়
+- Code quality check → push এর আগে ধীর lint/typecheck
+- Bundle size বাড়ে → CI fail না হওয়া পর্যন্ত বোঝা যায় না
+- ল্যাপটপ গরম → dev server (Next.js, Vite, Metro, Expo…) অতিরিক্ত CPU নেয়
 
-**nextcool এই সব সমস্যার এক কমান্ডে সমাধান দেয়।**
+**nextcool এই সব এক কমান্ডে সমাধান দেয় — শুধু Next.js নয়, যেকোনো React প্রজেক্টে।**
 
 ```bash
 # আগে: অনেকগুলো ম্যানুয়াল ধাপ
-npm run lint
-npm run format
-npm run typecheck
-rm -rf .next .turbo node_modules/.cache
-npm install
-npm run build
+npm run lint && npm run format && npx tsc --noEmit
+rm -rf .next dist .vite node_modules/.cache
+npm install && npm run build
 
-# এখন: মাত্র এক কমান্ড
+# এখন: এক কমান্ড
 npx nextcool prep
 ```
+
+---
+
+### 🧩 সাপোর্টেড ফ্রেমওয়ার্ক
+
+| Framework | চেনার উপায় | ক্লিন টার্গেট (উদাহরণ) |
+|-----------|--------------|------------------------|
+| **Next.js** | `next` | `.next`, `.turbo` |
+| **Vite** | `vite` | `dist`, `.vite` |
+| **Remix** | `remix` / `@remix-run/node` | `build`, `.cache` |
+| **Expo** | `expo` | `.expo` |
+| **React Native** | `react-native` | shared caches |
+| **Electron** | `electron` | `dist`, `out`, `release` |
+| **Gatsby** | `gatsby` | `.cache` |
+| **Astro** | `astro` | `dist`, `.astro` |
+| **CRA** | `react-scripts` | `build` |
+| **Generic React** | `react` | `dist` |
+
+`package.json`-এ `react` বা উপরের যেকোনো dependency থাকলেই চলবে। `--force` দিয়ে override করা যায়।
 
 ---
 
 ### 📖 ইনস্টলেশন ও সেটআপ
 
 ```bash
-# ইনস্টল ছাড়াই npx দিয়ে সরাসরি ব্যবহার করুন
+# ইনস্টল ছাড়াই npx দিয়ে
 npx nextcool
 
-# অথবা গ্লোবাল ইনস্টল করুন
-pnpm add -g nextcool
-npm install -g nextcool
+# গ্লোবাল ইনস্টল
 bun add -g nextcool
+pnpm add -g nextcool
 
-# অথবা package.json scripts-এ যোগ করুন
+# package.json scripts
 {
   "scripts": {
     "prep": "npx nextcool prep",
@@ -191,7 +251,7 @@ bun add -g nextcool
 }
 ```
 
-**💡 Windows টিপ:** স্ক্রিপ্টে সবসময় `npx nextcool` ব্যবহার করুন, শুধু `nextcool` নয়।
+**💡 Windows:** স্ক্রিপ্টে সবসময় `npx nextcool` ব্যবহার করুন।
 
 ---
 
@@ -199,36 +259,25 @@ bun add -g nextcool
 
 | কমান্ড | কী করে |
 |--------|--------|
-| **Interactive** | `npx nextcool` - ইন্টারঅ্যাক্টিভ TUI মেনু |
-| **PREP** | `npx nextcool prep` - অটো-ফিক্স এবং ভেরিফাই (কমিটের আগে) |
-| **COOL** | `npx nextcool cool` - সম্পূর্ণ পাইপলাইন: kill → clean → rebuild |
-| **FULLCLEAN** | `npx nextcool fullclean` - ডিপ রিসেট + ক্লিনআপ + বিল্ড |
-| **CI** | `npx nextcool ci` - কোয়ালিটি গেট এবং বিল্ড রিপোর্ট |
-| **CLEAN** | `npx nextcool clean` - টার্গেট ফোল্ডার ও ক্যাশ ডিলিট করা |
-| **KILL** | `npx nextcool kill` - জম্বি নোড প্রসেস বন্ধ করা |
-| **PURGE** | `npx nextcool purge` - প্যাকেজ ম্যানেজার ক্যাশ পরিষ্কার করা |
-| **DOCTOR** | `npx nextcool doctor` - সিস্টেম ও এনভায়রনমেন্ট হেলথ চেক |
-| **ACTION-RUNNER** | `npx nextcool action-runner` - GitHub Actions সেটআপ করা |
+| **Interactive** | `npx nextcool` — TUI মেনু |
+| **PREP** | `npx nextcool prep` — কমিটের আগে auto-fix + verify |
+| **COOL** | `npx nextcool cool` — kill → clean → reinstall → build |
+| **FULLCLEAN** | `npx nextcool fullclean` — deep reset + lint + format |
+| **CI** | `npx nextcool ci` — quality gate + build report |
+| **CLEAN** | `npx nextcool clean` — ফ্রেমওয়ার্ক অনুযায়ী cache/output মুছে |
+| **KILL** | `npx nextcool kill` — zombie node প্রসেস বন্ধ |
+| **PURGE** | `npx nextcool purge` — PM cache পরিষ্কার |
+| **DOCTOR** | `npx nextcool doctor` — RAM, disk, framework, zombies |
+| **ACTION-RUNNER** | `npx nextcool action-runner` — GitHub Actions সেটআপ |
 
 ---
 
 #### ১) **PREP** — প্রতিটি কমিটের আগে ⭐
 
 ```bash
-npx nextcool prep
-```
-
-**কাজ:**
-- **পার্ট ১** (অটো-ফিক্স): `eslint --fix` এবং `prettier --write`
-- **পার্ট ২** (চেক): `eslint` কড়াকড়ি চেক, `prettier --check` এবং `tsc --noEmit`
-
-**উদাহরণ:**
-
-```bash
-npx nextcool prep --yes        # কনফার্মেশন ছাড়াই চালানো
-npx nextcool prep --ci         # CI মোডে চালানো
-npx nextcool prep --dry-run    # শুধু কী কী হবে তা দেখা
-npx nextcool prep --memory 2048 # ২ জিবি মেমরি লিমিট
+npx nextcool prep --yes
+npx nextcool prep --ci         # CI মোড
+npx nextcool prep --dry-run
 ```
 
 ---
@@ -236,95 +285,65 @@ npx nextcool prep --memory 2048 # ২ জিবি মেমরি লিমি�
 #### ২) **COOL** — সম্পূর্ণ পাইপলাইন
 
 ```bash
-npx nextcool cool
-```
-
-**পাইপলাইন:** প্রসেস বন্ধ → ডিরেক্টরি সাফ → ক্যাশ ক্লিয়ার → নতুন করে ইনস্টল → বিল্ড
-
-```bash
-npx nextcool cool --yes        # সরাসরি কমান্ড চালানো
-npx nextcool cool --full       # node_modules-সহ ডিলিট করা
-npx nextcool cool --dev        # শেষে dev সার্ভার চালু করা
-npx nextcool cool --prod       # শেষে প্রোডাকশন সার্ভার চালু করা
-npx nextcool cool --webpack    # Turbopack ছাড়া বিল্ড করা
-npx nextcool cool --memory 4096 # ৪ জিবি মেমরি লিমিট
+npx nextcool cool --yes
+npx nextcool cool --full       # node_modules সহ
+npx nextcool cool --dev        # শেষে dev server (framework অনুযায়ী)
+npx nextcool cool --prod       # শেষে prod server
+npx nextcool cool --webpack    # শুধু Next.js: Turbopack বন্ধ
 ```
 
 ---
 
-#### ৩) **FULLCLEAN** — মোক্ষম রিসেট
-
-```bash
-npx nextcool fullclean
-```
-
-সব জম্বি প্রসেস বন্ধ করে, `node_modules` মুছে নতুন করে সবকিছু ফ্রেশভাবে শুরু করার জন্য।
+#### ৩) **FULLCLEAN** — nuclear reset
 
 ```bash
 npx nextcool fullclean --yes
-npx nextcool fullclean --dev
 ```
 
 ---
 
-#### ৪) **CI** — CI কোয়ালিটি গেট
+#### ৪) **CI** — quality gate + bundle report
 
 ```bash
-npx nextcool ci
+npx nextcool ci --report
+npx nextcool ci --baseline report.json --fail-on-growth 5
 ```
 
-**পাইপলাইন:** install → typecheck → lint → format:check → build
+Build report ফ্রেমওয়ার্ক অনুযায়ী output measure করে (Next.js → `.next`, Vite → `dist`, ইত্যাদি)।
+
+---
+
+#### ৫–১০) **CLEAN**, **KILL**, **PURGE**, **DOCTOR**, **ACTION-RUNNER**, **Interactive**
+
+সরাসরি cache/output, zombie process, PM cache, diagnostics, বা TUI মেনু — প্রয়োজন অনুযায়ী।
+
+---
+
+### ⚙️ গ্লোবাল অপশন
 
 ```bash
-npx nextcool ci --report                     # বিল্ড সাইজ রিপোর্ট তৈরি
-npx nextcool ci --baseline report.json       # আগের রিপোর্টের সাথে তুলনা
-npx nextcool ci --fail-on-growth 5           # সাইজ ৫% এর বেশি বাড়লে ফেল
+--yes              # confirmation skip
+--dry-run          # trial only
+--full             # node_modules সহ clean
+--webpack          # Next.js only: --no-turbo
+--memory <mb>      # Node memory cap
+--cwd <path>       # target project
+--force            # React project check skip
+--dev / --prod     # pipeline শেষে server (framework-aware)
 ```
 
 ---
 
-#### ৫) **CLEAN**, ৬) **KILL**, ৭) **PURGE**
+### 🚀 অ্যাডভান্সড
 
-সরাসরি ও সহজে বিল্ড আর্টিফ্যাক্ট, জম্বি প্রসেস বা প্যাকেজ ম্যানেজার ক্যাশ পরিষ্কার করতে এগুলো ব্যবহার করুন।
-
----
-
-#### ৮) **DOCTOR**, ৯) **ACTION-RUNNER**, ১০) **ইন্টারঅ্যাক্টিভ মেনু**
-
-সিস্টেম ডায়াগনস্টিক, GitHub Actions সেটআপ বা গ্রাফিক্যাল মেনুর মাধ্যমে কাজ করতে এগুলো ব্যবহার করুন।
+- **CPU-limited server:** `npx nextcool cool --dev` — core affinity দিয়ে dev server চালায়
+- **Bundle tracking:** `npx nextcool ci --report` — PR-এ size regression ধরতে
 
 ---
 
-### ⚙️ গ্লোবাল অপশন (সব কমান্ডে কাজ করে)
-
-```bash
---yes              # সব কনফার্মেশন স্কিপ করা
---dry-run          # কোনো পরিবর্তন ছাড়া শুধু ট্রায়াল দেখা
---full             # node_modules ক্লিনআপ করা
---webpack          # --no-turbo ব্যবহার করে বিল্ড করা
---memory <mb>      # নোড মেমরি সীমা নির্ধারণ (MB)
---cwd <path>       # নির্দিষ্ট প্রজেক্ট ডিরেক্টরিতে কাজ করা
---dev              # পাইপলাইন শেষে dev সার্ভার চালু করা
---prod              # পাইপলাইন শেষে প্রোডাকশন সার্ভার চালু করা
-```
-
----
-
-### 🚀 অ্যাডভান্সড ফিচার
-
-#### CPU-লিমিটেড Dev সার্ভার
-ল্যাপটপ অতিরিক্ত গরম হওয়া ঠেকাতে `npx nextcool cool --dev` ব্যবহার করুন। এটি CPU core affinity ব্যবহার করে প্রসেস কন্ট্রোল করে।
-
-#### বান্ডল সাইজ ট্র্যাকিং
-CI-তে `npx nextcool ci --report` ব্যবহার করে আপনার অ্যাপের সাইজ ট্র্যাক করুন এবং আগের ভার্সনের সাথে তুলনা করুন।
-
----
-
-### 🪟 প্ল্যাটফর্ম সাপোর্ট
+### 🪟 প্ল্যাটফর্ম
 
 macOS ✅ · Linux ✅ · Windows ✅ · WSL ✅
-
-**Windows ইউজারদের জন্য:** স্ক্রিপ্টে সবসময় `npx nextcool` ব্যবহার করুন।
 
 ---
 

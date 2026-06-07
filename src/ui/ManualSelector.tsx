@@ -9,13 +9,13 @@ export interface StepOption {
 }
 
 export const STEP_OPTIONS: StepOption[] = [
-  { id: "kill",    label: "Kill processes",       desc: "kill all node/next processes",          defaultOn: true },
-  { id: "clean",   label: "Clean artifacts",      desc: "remove .next, .turbo, .swc, caches",   defaultOn: true },
+  { id: "kill",    label: "Kill processes",       desc: "kill zombie node processes",            defaultOn: true },
+  { id: "clean",   label: "Clean artifacts",      desc: "remove .next/dist/.vite and caches",   defaultOn: true },
   { id: "purge",   label: "Purge PM cache",       desc: "bun/pnpm/npm/yarn global cache wipe",  defaultOn: true },
   { id: "install", label: "Reinstall deps",       desc: "run install with detected PM",         defaultOn: true },
-  { id: "build",   label: "Rebuild project",      desc: "run next build",                       defaultOn: true },
+  { id: "build",   label: "Rebuild project",      desc: "run framework build (or npm run build)", defaultOn: true },
   { id: "full",    label: "Also delete node_modules", desc: "nukes node_modules (use with reinstall)", defaultOn: false },
-  { id: "webpack", label: "Use --webpack flag",   desc: "fall back to webpack (Turbopack fix)", defaultOn: false },
+  { id: "webpack", label: "Use --webpack flag",   desc: "Next.js only: fall back to webpack", defaultOn: false },
 ];
 
 export interface ManualSelection {

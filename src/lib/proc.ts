@@ -7,10 +7,20 @@ export interface NodeProcess {
   memory: number;
 }
 
-const NEXT_PATTERNS = [
+const DEV_PATTERNS = [
   /next[\s-]?(dev|build|start|server)/i,
   /turbopack/i,
   /next-server/i,
+  /vite(\s|$)/i,
+  /webpack-dev-server/i,
+  /react-scripts\s+(start|build)/i,
+  /expo\s+start/i,
+  /react-native\s+start/i,
+  /remix\s+dev/i,
+  /gatsby\s+(develop|serve)/i,
+  /astro\s+dev/i,
+  /electron(\.exe)?(\s|$)/i,
+  /metro(\.exe)?(\s|$)/i,
 ];
 
 const NODE_PATTERN = /^node(\.exe)?$/i;
@@ -21,7 +31,7 @@ export async function listNodeProcesses(): Promise<NodeProcess[]> {
     .filter(
       (p) =>
         NODE_PATTERN.test(p.name) ||
-        NEXT_PATTERNS.some((re) => re.test(p.cmd ?? ""))
+        DEV_PATTERNS.some((re) => re.test(p.cmd ?? ""))
     )
     .map((p) => {
       // ps-list returns memory in bytes on macOS/Linux

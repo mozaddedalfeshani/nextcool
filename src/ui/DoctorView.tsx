@@ -54,11 +54,23 @@ export function DoctorView({ report }: Props) {
           Project
         </Text>
         <Row label="Package manager" value={report.pm} />
-        <Row label="Next.js" value={report.nextVersion ?? "not detected"} ok={report.isNextProject} />
-        <Row label=".next size" value={report.dotNextSizeMb > 0 ? formatMb(report.dotNextSizeMb) : "empty"} ok={report.dotNextSizeMb < 500} />
+        <Row
+          label="Framework"
+          value={report.frameworkVersion ? `${report.frameworkLabel} ${report.frameworkVersion}` : report.frameworkLabel}
+          ok={report.isReactProject}
+        />
+        <Row
+          label="Build output"
+          value={report.buildOutputSizeMb > 0 ? formatMb(report.buildOutputSizeMb) : "empty"}
+          ok={report.buildOutputSizeMb < 500}
+        />
         <Row label="node_modules size" value={report.nodeModulesSizeMb > 0 ? formatMb(report.nodeModulesSizeMb) : "empty"} />
-        <Row label="Turbopack" value={report.hasTurbopack ? "detected" : "not detected"} />
-        <Row label="Webpack fallback" value={report.hasWebpackFallback ? "yes" : "no"} />
+        {report.framework === "next" && (
+          <>
+            <Row label="Turbopack" value={report.hasTurbopack ? "detected" : "not detected"} />
+            <Row label="Webpack fallback" value={report.hasWebpackFallback ? "yes" : "no"} />
+          </>
+        )}
       </Box>
 
       <Box
@@ -72,7 +84,7 @@ export function DoctorView({ report }: Props) {
           Processes
         </Text>
         <Row
-          label="Zombie node/next"
+          label="Zombie node"
           value={
             report.zombieCount > 0
               ? `${report.zombieCount} running, ~${formatMb(report.zombieMemMb)} RSS`

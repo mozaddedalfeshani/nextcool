@@ -8,13 +8,25 @@ export interface CleanTarget {
   label: string;
 }
 
-export const PROJECT_TARGETS: CleanTarget[] = [
-  { rel: ".next", label: ".next build cache" },
+/** Shared cache dirs for any React/Node project — framework-specific dirs added at runtime. */
+export const BASE_CLEAN_TARGETS: CleanTarget[] = [
   { rel: ".turbo", label: ".turbo cache" },
   { rel: "node_modules/.cache", label: "node_modules/.cache" },
   { rel: ".swc", label: ".swc cache" },
   { rel: "tsconfig.tsbuildinfo", label: "tsconfig.tsbuildinfo" },
   { rel: ".eslintcache", label: ".eslintcache" },
+];
+
+/** Default targets when framework detection is unavailable (includes common outputs). */
+export const PROJECT_TARGETS: CleanTarget[] = [
+  ...BASE_CLEAN_TARGETS,
+  { rel: ".next", label: ".next build cache" },
+  { rel: "dist", label: "dist output" },
+  { rel: "build", label: "build output" },
+  { rel: ".vite", label: ".vite cache" },
+  { rel: ".expo", label: ".expo cache" },
+  { rel: ".astro", label: ".astro cache" },
+  { rel: ".cache", label: ".cache" },
 ];
 
 export const FULL_TARGETS: CleanTarget[] = [

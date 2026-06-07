@@ -1,23 +1,24 @@
 import { existsSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
+import { getBuildOutputPaths } from "./detect-framework.js";
 
 /**
- * Build report: what `nextcool ci --report` measures after `next build`.
+ * Build report: what `nextcool ci --report` measures after a project build.
  *
- * Goal in CI is not cleanup but *visibility* — surface build time and the
- * size of what ships, and (with a --baseline) flag size regressions on a PR
- * before they merge. Written as JSON (machine, for the next run's baseline)
- * and as a markdown table to $GITHUB_STEP_SUMMARY (human, in the Actions UI).
+ * Goal in CI is visibility — surface build time and output size, and (with
+ * --baseline) flag size regressions on a PR before they merge.
  */
 
-export const REPORT_VERSION = 1 as const;
+export const REPORT_VERSION = 2 as const;
 
 export interface BuildReport {
   version: typeof REPORT_VERSION;
-  generatedAt: string; // ISO timestamp
-  buildMs: number; // wall-clock duration of `next build`
-  dotNextBytes: number; // total .next output
-  staticBytes: number; // .next/static — the client bundle that ships to users
+  generatedAt: string;
+  buildMs: number;
+  outputBytes: number;
+  clientBytes: number | null;
+  outputDir: string;
+  clientDir: string | null;
 }
 
 async function dirBytes(dir: string): Promise<number> {
@@ -30,22 +31,28 @@ async function dirBytes(dir: string): Promise<number> {
   }
 }
 
-/** Measure the build output in `cwd/.next` and pair it with the build time. */
+/** Measure build output and pair it with the build time. */
 export async function measureBuildReport(
   cwd: string,
   buildMs: number
 ): Promise<BuildReport> {
-  const dotNext = join(cwd, ".next");
-  const [dotNextBytes, staticBytes] = await Promise.all([
-    dirBytes(dotNext),
-    dirBytes(join(dotNext, "static")),
+  const paths = getBuildOutputPaths(cwd);
+  const outputPath = join(cwd, paths.outputDir);
+  const clientPath = paths.clientBundleDir ? join(cwd, paths.clientBundleDir) : null;
+
+  const [outputBytes, clientBytes] = await Promise.all([
+    dirBytes(outputPath),
+    clientPath ? dirBytes(clientPath) : Promise.resolve(null),
   ]);
+
   return {
     version: REPORT_VERSION,
     generatedAt: new Date().toISOString(),
     buildMs,
-    dotNextBytes,
-    staticBytes,
+    outputBytes,
+    clientBytes,
+    outputDir: paths.outputDir,
+    clientDir: paths.clientBundleDir,
   };
 }
 
@@ -53,13 +60,32 @@ export function writeReportJson(path: string, report: BuildReport): void {
   writeFileSync(path, JSON.stringify(report, null, 2), "utf8");
 }
 
-/** Read a previous report (a base-branch baseline). Returns null if absent/invalid. */
+/** Read a previous report (base-branch baseline). Returns null if absent/invalid. */
 export function readReportJson(path: string): BuildReport | null {
   try {
     if (!existsSync(path)) return null;
-    const r = JSON.parse(readFileSync(path, "utf8")) as BuildReport;
-    if (r.version !== REPORT_VERSION) return null;
-    return r;
+    const r = JSON.parse(readFileSync(path, "utf8")) as BuildReport & {
+      dotNextBytes?: number;
+      staticBytes?: number;
+      version?: number;
+    };
+
+    if (r.version === REPORT_VERSION) return r;
+
+    // Migrate v1 (Next.js-only) reports
+    if (r.version === 1 || (r.dotNextBytes !== undefined && r.staticBytes !== undefined)) {
+      return {
+        version: REPORT_VERSION,
+        generatedAt: r.generatedAt,
+        buildMs: r.buildMs,
+        outputBytes: r.dotNextBytes ?? r.outputBytes ?? 0,
+        clientBytes: r.staticBytes ?? r.clientBytes ?? null,
+        outputDir: ".next",
+        clientDir: ".next/static",
+      };
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -88,7 +114,6 @@ function delta(current: number, base: number): Delta {
   return { bytes: d, pct };
 }
 
-/** Markdown delta cell, e.g. `+412 KB (+3.1%) ⚠️` or `—`. fmt matches the row's unit. */
 function deltaCell(
   current: number,
   base: number | undefined,
@@ -109,6 +134,11 @@ export function renderStepSummary(
   baseline: BuildReport | null,
   warnPct: number
 ): string {
+  const paths = {
+    outputLabel: `Total output (${report.outputDir})`,
+    clientLabel: report.clientDir ? `Client bundle (${report.clientDir})` : null,
+  };
+
   const head = baseline
     ? "| Metric | Current | Base | Δ |\n| --- | --- | --- | --- |"
     : "| Metric | Current |\n| --- | --- |";
@@ -123,14 +153,22 @@ export function renderStepSummary(
     "",
     head,
     row("Build time", formatMs, report.buildMs, baseline?.buildMs),
-    row("Client bundle (.next/static)", formatBytes, report.staticBytes, baseline?.staticBytes),
-    row("Total output (.next)", formatBytes, report.dotNextBytes, baseline?.dotNextBytes),
-    "",
   ];
+
+  if (paths.clientLabel && report.clientBytes !== null) {
+    lines.push(
+      row(paths.clientLabel, formatBytes, report.clientBytes, baseline?.clientBytes ?? undefined)
+    );
+  }
+
+  lines.push(
+    row(paths.outputLabel, formatBytes, report.outputBytes, baseline?.outputBytes),
+    ""
+  );
+
   return lines.join("\n");
 }
 
-/** Append markdown to the GitHub Actions job summary, if running in Actions. */
 export function appendStepSummary(markdown: string): boolean {
   const path = process.env["GITHUB_STEP_SUMMARY"];
   if (!path) return false;
@@ -144,7 +182,7 @@ export function appendStepSummary(markdown: string): boolean {
 
 /**
  * Decide whether bundle growth should fail the run.
- * Compares client bundle (.next/static) growth against failPct.
+ * Compares client bundle growth when available, else total output growth.
  */
 export function evaluateGrowth(
   report: BuildReport,
@@ -152,11 +190,16 @@ export function evaluateGrowth(
   failPct: number
 ): { failed: boolean; message: string } {
   if (!baseline || failPct <= 0) return { failed: false, message: "" };
-  const d = delta(report.staticBytes, baseline.staticBytes);
+
+  const current = report.clientBytes ?? report.outputBytes;
+  const base = baseline.clientBytes ?? baseline.outputBytes;
+  const label = report.clientDir ?? report.outputDir;
+
+  const d = delta(current, base);
   if (d.bytes > 0 && d.pct >= failPct) {
     return {
       failed: true,
-      message: `Client bundle grew ${formatBytes(d.bytes)} (+${d.pct.toFixed(1)}%), over the ${failPct}% limit.`,
+      message: `${label} grew ${formatBytes(d.bytes)} (+${d.pct.toFixed(1)}%), over the ${failPct}% limit.`,
     };
   }
   return { failed: false, message: "" };

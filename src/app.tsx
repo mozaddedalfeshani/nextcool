@@ -20,10 +20,11 @@ import { runPrep, type PrepResult } from "./commands/prep.js";
 import { PrepErrors } from "./ui/PrepErrors.js";
 import { PrepDashboard } from "./ui/PrepDashboard.js";
 import { spawnServer, type ServerHandle, type ServerMode } from "./commands/run-server.js";
-import { detectPm, detectAllPms, detectNextVersion, isNextProject, type PackageManager, type DetectedPm } from "./lib/detect-pm.js";
+import { detectPm, detectAllPms, type PackageManager, type DetectedPm } from "./lib/detect-pm.js";
+import { detectFramework, isReactProject } from "./lib/detect-framework.js";
 import os from "node:os";
 
-const VERSION = "2.2.17";
+const VERSION = "2.2.20";
 
 export type AppMode =
   | "interactive"   // show main menu
@@ -84,11 +85,11 @@ export function App(props: AppProps) {
   const { mode, cwd } = props;
   const { exit } = useApp();
   const pm = detectPm(cwd);
-  const nextVersion = detectNextVersion(cwd);
+  const fw = detectFramework(cwd);
   const platform = `${os.platform()} ${os.arch()}`;
 
-  const needsNextProject = mode !== "doctor" && mode !== "kill" && mode !== "purge";
-  const noProject = needsNextProject && !isNextProject(cwd);
+  const needsReactProject = mode !== "doctor" && mode !== "kill" && mode !== "purge";
+  const noProject = needsReactProject && !isReactProject(cwd);
 
   const [screen, setScreen] = useState<Screen>(() => {
     if (noProject && mode === "interactive") return "no-project";
@@ -282,7 +283,7 @@ export function App(props: AppProps) {
 
   return (
     <Box flexDirection="column" paddingX={1}>
-      <Banner version={VERSION} pm={pm} nextVersion={nextVersion} platform={platform} />
+      <Banner version={VERSION} pm={pm} framework={fw} platform={platform} />
 
       <StatsBar />
 
@@ -294,11 +295,11 @@ export function App(props: AppProps) {
 
       {screen === "no-project" && (
         <Box flexDirection="column" marginTop={1}>
-          <Text color="red" bold>✗ No Next.js project found in:</Text>
+          <Text color="red" bold>✗ No React project found in:</Text>
           <Text color="yellow">  {cwd}</Text>
-          <Text dimColor>  Make sure package.json has a "next" dependency.</Text>
+          <Text dimColor>  Add react or a framework (Next.js, Vite, Expo, …) to package.json.</Text>
           <Text> </Text>
-          <Text dimColor>  cd into your Next.js project, then run:</Text>
+          <Text dimColor>  cd into your project, then run:</Text>
           <Text color="cyan">  nextcool</Text>
         </Box>
       )}
@@ -378,6 +379,7 @@ export function App(props: AppProps) {
       {screen === "run-server" && serverHandle && (
         <ServerView
           handle={serverHandle}
+          frameworkLabel={serverHandle.label}
           cores={serverCores}
           totalCores={totalCores}
           mode={serverMode}

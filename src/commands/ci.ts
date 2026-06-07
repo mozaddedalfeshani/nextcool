@@ -5,6 +5,7 @@ import { runCmd } from "../lib/exec.js";
 import { resolveBin } from "../lib/cmd.js";
 import { logBus, type LogLine } from "../lib/log-bus.js";
 import { detectPm, type PackageManager } from "../lib/detect-pm.js";
+import { detectFramework } from "../lib/detect-framework.js";
 import { runReinstall } from "./reinstall.js";
 import { runLint } from "./lint.js";
 import { runFormat } from "./format.js";
@@ -56,6 +57,7 @@ const DEFAULT_WARN_PCT = 5;
 export async function runCi(opts: CiOptions = {}): Promise<CiResult> {
   const cwd = opts.cwd ?? process.cwd();
   const pm = opts.pm ?? detectPm(cwd);
+  const fw = detectFramework(cwd);
 
   // Stream every subprocess line to stdout, indented, so CI logs show real output.
   const onLine = (l: LogLine) => process.stdout.write(pc.dim(`    ${l.text}\n`));
@@ -109,7 +111,7 @@ export async function runCi(opts: CiOptions = {}): Promise<CiResult> {
     }))) return finish(false, 1);
 
     // 5. build (+ optional report)
-    if (!(await step("Build (next build)", async () => {
+    if (!(await step(`Build (${fw.label})`, async () => {
       const r = await runRebuild({ cwd, webpack: opts.webpack, memoryMb: opts.memoryMb });
       buildMs = r.durationMs;
       return { ok: r.success, detail: r.success ? formatMs(r.durationMs) : `exit ${r.exitCode}` };
@@ -161,8 +163,10 @@ async function emitReport(
   process.stdout.write(
     pc.bold("\n🧊 build report\n") +
       `   build time:    ${formatMs(report.buildMs)}\n` +
-      `   client bundle: ${formatBytes(report.staticBytes)}\n` +
-      `   total .next:   ${formatBytes(report.dotNextBytes)}\n` +
+      (report.clientBytes !== null && report.clientDir
+        ? `   client bundle: ${formatBytes(report.clientBytes)} (${report.clientDir})\n`
+        : "") +
+      `   total output:  ${formatBytes(report.outputBytes)} (${report.outputDir})\n` +
       (wrote ? pc.dim("   (written to job summary)\n") : "") +
       pc.dim(`   (report json:  ${out})\n\n`)
   );

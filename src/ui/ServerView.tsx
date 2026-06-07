@@ -5,6 +5,7 @@ import type { ServerHandle, ServerMode } from "../commands/run-server.js";
 
 interface ServerViewProps {
   handle: ServerHandle;
+  frameworkLabel: string;
   cores: number;
   totalCores: number;
   mode: ServerMode;
@@ -13,7 +14,7 @@ interface ServerViewProps {
 
 type Status = "running" | "stopping" | "stopped";
 
-export function ServerView({ handle, cores, totalCores, mode, onStop }: ServerViewProps) {
+export function ServerView({ handle, frameworkLabel, cores, totalCores, mode, onStop }: ServerViewProps) {
   const [status, setStatus] = useState<Status>("running");
 
   useInput(
@@ -38,7 +39,7 @@ export function ServerView({ handle, cores, totalCores, mode, onStop }: ServerVi
   return (
     <Box flexDirection="column" marginTop={1}>
       <Box gap={2}>
-        <Text bold color="cyan">Next.js</Text>
+        <Text bold color="cyan">{frameworkLabel}</Text>
         <Text color="white">[{mode}]</Text>
         <Text dimColor>{cores}/{totalCores} cores</Text>
         <Text color={statusColor} bold>{statusLabel}</Text>

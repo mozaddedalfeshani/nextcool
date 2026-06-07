@@ -6,6 +6,7 @@ import { runRebuild } from "./rebuild.js";
 import { runLint } from "./lint.js";
 import { runFormat } from "./format.js";
 import { detectPm, type PackageManager } from "../lib/detect-pm.js";
+import { detectFramework } from "../lib/detect-framework.js";
 import { logBus } from "../lib/log-bus.js";
 
 export type StepStatus = "pending" | "running" | "done" | "error" | "skipped";
@@ -44,10 +45,11 @@ export interface CoolResult {
 export async function runCool(opts: CoolOptions = {}): Promise<CoolResult> {
   const cwd = opts.cwd ?? process.cwd();
   const pm = opts.pm ?? detectPm(cwd);
+  const fw = detectFramework(cwd);
   const start = Date.now();
 
   const steps: StepState[] = [
-    { id: "kill", label: "Kill node/next processes", status: "pending", detail: "" },
+    { id: "kill", label: "Kill node processes", status: "pending", detail: "" },
     { id: "clean", label: "Remove build artifacts", status: "pending", detail: "" },
     { id: "purge", label: `Purge ${pm} cache`, status: "pending", detail: "" },
     { id: "install", label: "Reinstall dependencies", status: "pending", detail: "" },
@@ -161,7 +163,7 @@ export async function runCool(opts: CoolOptions = {}): Promise<CoolResult> {
 
   // Step 5: rebuild
   if (!opts.skipBuild) {
-    setStep("build", "running", opts.webpack ? "webpack mode..." : "turbopack...");
+    setStep("build", "running", opts.webpack && fw.supportsWebpackFlag ? "webpack mode..." : `${fw.label} build...`);
     try {
       const r = await runRebuild({
         dryRun: opts.dryRun,
