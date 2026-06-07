@@ -1,6 +1,6 @@
 {
   "name": "nextcool",
-  "version": "2.2.19",
+  "version": "2.2.20",
   "description": "Kill zombie node processes, purge caches, rebuild React projects — stop laptop overheating.",
   "type": "module",
   "bin": {
